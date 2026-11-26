@@ -1,4 +1,11 @@
-import { MAX_TEXT_LENGTH, TodoDB } from "./db";
+import {
+  MAX_TEXT_LENGTH,
+  TodoDB,
+  isValidPriority,
+  isValidStatus,
+  type TodoPriority,
+  type TodoStatus,
+} from "./db";
 
 interface JsonRpcRequest {
   jsonrpc?: string;
@@ -12,14 +19,19 @@ const PROTOCOL_VERSION = "2025-03-26";
 const TOOLS = [
   {
     name: "list_todos",
-    description: "List tasks in the shared todo list.",
+    description: "List tasks on the shared Kanban & todo board.",
     inputSchema: {
       type: "object",
       properties: {
-        filter: {
+        status: {
           type: "string",
-          enum: ["all", "active", "completed"],
-          description: "Filter tasks by completion state (default: all).",
+          enum: ["all", "todo", "in_progress", "done", "active", "completed"],
+          description: "Filter by Kanban column or completion state (default: all).",
+        },
+        priority: {
+          type: "string",
+          enum: ["low", "medium", "high"],
+          description: "Optional priority filter.",
         },
       },
       additionalProperties: false,
@@ -27,7 +39,7 @@ const TOOLS = [
   },
   {
     name: "add_todo",
-    description: "Add a new task to the shared todo list.",
+    description: "Add a new task card to the shared Kanban board.",
     inputSchema: {
       type: "object",
       properties: {
@@ -35,7 +47,17 @@ const TOOLS = [
           type: "string",
           minLength: 1,
           maxLength: MAX_TEXT_LENGTH,
-          description: "Task description.",
+          description: "Task title/description.",
+        },
+        status: {
+          type: "string",
+          enum: ["todo", "in_progress", "done"],
+          description: "Target Kanban column (default: todo).",
+        },
+        priority: {
+          type: "string",
+          enum: ["low", "medium", "high"],
+          description: "Task priority (default: medium).",
         },
       },
       required: ["text"],
@@ -43,18 +65,31 @@ const TOOLS = [
     },
   },
   {
-    name: "toggle_todo",
-    description: "Mark a task as completed or active, or edit its text.",
+    name: "move_todo",
+    description: "Move a task card to another Kanban column, update its priority, or edit its text.",
     inputSchema: {
       type: "object",
       properties: {
         id: { type: "string", description: "Todo ID." },
-        done: { type: "boolean", description: "New completion state." },
+        status: {
+          type: "string",
+          enum: ["todo", "in_progress", "done"],
+          description: "Destination Kanban column.",
+        },
+        priority: {
+          type: "string",
+          enum: ["low", "medium", "high"],
+          description: "Updated priority.",
+        },
         text: {
           type: "string",
           minLength: 1,
           maxLength: MAX_TEXT_LENGTH,
-          description: "Optional updated task text.",
+          description: "Updated task text.",
+        },
+        done: {
+          type: "boolean",
+          description: "Optional boolean completion flag.",
         },
       },
       required: ["id"],
@@ -62,8 +97,21 @@ const TOOLS = [
     },
   },
   {
+    name: "toggle_todo",
+    description: "Toggle a task between done and todo (or set done explicitly).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Todo ID." },
+        done: { type: "boolean", description: "Optional explicit completion state." },
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "delete_todo",
-    description: "Delete a single task from the shared todo list by ID.",
+    description: "Delete a single task card from the shared board by ID.",
     inputSchema: {
       type: "object",
       properties: {
@@ -75,7 +123,7 @@ const TOOLS = [
   },
   {
     name: "clear_completed",
-    description: "Delete all completed tasks from the shared todo list.",
+    description: "Delete all tasks in the Done column.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -121,7 +169,6 @@ export function handleMcpPayload(
     return { status: 400, body: rpcError(id, -32600, "Invalid JSON-RPC 2.0 payload") };
   }
 
-  // Notifications have no id and require 202 Accepted with empty body
   if (req.method === "notifications/initialized" || req.method.startsWith("notifications/")) {
     return { status: 202, body: null };
   }
@@ -134,8 +181,8 @@ export function handleMcpPayload(
           protocolVersion: PROTOCOL_VERSION,
           capabilities: { tools: {} },
           serverInfo: {
-            name: "todo-shared-mcp",
-            version: "1.0.0",
+            name: "todo-kanban-mcp",
+            version: "1.1.0",
           },
         }),
       };
@@ -160,9 +207,16 @@ export function handleMcpPayload(
       try {
         switch (name) {
           case "list_todos": {
-            const f = args.filter;
-            const filter = f === "active" || f === "completed" ? f : "all";
-            const todos = db.list(filter);
+            const rawStatus = args.status ?? args.filter;
+            const status =
+              rawStatus === "active" ||
+              rawStatus === "completed" ||
+              rawStatus === "all" ||
+              isValidStatus(rawStatus)
+                ? rawStatus
+                : "all";
+            const priority = isValidPriority(args.priority) ? args.priority : undefined;
+            const todos = db.list({ status, priority });
             return { status: 200, body: rpcResult(id, toolSuccess({ count: todos.length, todos })) };
           }
 
@@ -170,9 +224,32 @@ export function handleMcpPayload(
             if (typeof args.text !== "string") {
               return { status: 200, body: rpcResult(id, toolFailure("Missing string argument: text")) };
             }
-            const todo = db.add(args.text);
+            const status: TodoStatus | undefined = isValidStatus(args.status)
+              ? args.status
+              : undefined;
+            const priority: TodoPriority | undefined = isValidPriority(args.priority)
+              ? args.priority
+              : undefined;
+            const todo = db.add(args.text, { status, priority });
             onMutate();
             return { status: 200, body: rpcResult(id, toolSuccess({ todo })) };
+          }
+
+          case "move_todo": {
+            if (typeof args.id !== "string" || !args.id) {
+              return { status: 200, body: rpcResult(id, toolFailure("Missing string argument: id")) };
+            }
+            const updated = db.update(args.id, {
+              status: isValidStatus(args.status) ? args.status : undefined,
+              priority: isValidPriority(args.priority) ? args.priority : undefined,
+              text: typeof args.text === "string" ? args.text : undefined,
+              done: typeof args.done === "boolean" ? args.done : undefined,
+            });
+            if (!updated) {
+              return { status: 200, body: rpcResult(id, toolFailure(`Todo not found: ${args.id}`)) };
+            }
+            onMutate();
+            return { status: 200, body: rpcResult(id, toolSuccess({ todo: updated })) };
           }
 
           case "toggle_todo": {
@@ -184,8 +261,7 @@ export function handleMcpPayload(
               return { status: 200, body: rpcResult(id, toolFailure(`Todo not found: ${args.id}`)) };
             }
             const nextDone = typeof args.done === "boolean" ? args.done : !existing.done;
-            const nextText = typeof args.text === "string" ? args.text : undefined;
-            const updated = db.update(args.id, { done: nextDone, text: nextText });
+            const updated = db.update(args.id, { done: nextDone });
             onMutate();
             return { status: 200, body: rpcResult(id, toolSuccess({ todo: updated })) };
           }

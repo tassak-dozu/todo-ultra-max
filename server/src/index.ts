@@ -1,9 +1,9 @@
-import { TodoDB } from "./db";
+import { TodoDB, isValidPriority, isValidStatus } from "./db";
 import { handleMcpPayload } from "./mcp";
 
 const PORT = Number(process.env.PORT || 3000);
 const DB_PATH = process.env.DB_PATH || "/data/todos.db";
-const WRITE_LIMIT_PER_MIN = Number(process.env.WRITE_LIMIT_PER_MIN || 60);
+const WRITE_LIMIT_PER_MIN = Number(process.env.WRITE_LIMIT_PER_MIN || 90);
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +15,7 @@ const CORS_HEADERS: Record<string, string> = {
 const WS_TOPIC = "todos";
 
 const db = new TodoDB(DB_PATH);
+let onlineCount = 0;
 
 // Simple in-memory per-IP write rate limiter
 const writeBuckets = new Map<string, { count: number; resetAt: number }>();
@@ -52,7 +53,11 @@ let serverRef: ReturnType<typeof Bun.serve> | null = null;
 
 function broadcastSync() {
   if (!serverRef) return;
-  const payload = JSON.stringify({ type: "sync", todos: db.list("all") });
+  const payload = JSON.stringify({
+    type: "sync",
+    todos: db.list(),
+    online: onlineCount,
+  });
   serverRef.publish(WS_TOPIC, payload);
 }
 
@@ -76,14 +81,14 @@ serverRef = Bun.serve({
 
     // Health check
     if (path === "/api/health" && req.method === "GET") {
-      return json({ ok: true, transport: "http+ws+mcp" });
+      return json({ ok: true, transport: "http+ws+mcp", online: onlineCount });
     }
 
     // Streamable HTTP MCP endpoint
     if (path === "/mcp") {
       if (req.method === "GET") {
         return json({
-          name: "todo-shared-mcp",
+          name: "todo-kanban-mcp",
           transport: "streamable-http",
           endpoint: "/mcp",
           hint: "Send JSON-RPC 2.0 POST requests to /mcp",
@@ -132,16 +137,16 @@ serverRef = Bun.serve({
     // REST API: /api/todos
     if (path === "/api/todos") {
       if (req.method === "GET") {
-        return json({ todos: db.list("all") });
+        return json({ todos: db.list(), online: onlineCount });
       }
 
       if (req.method === "POST") {
         if (!checkWriteRateLimit(req)) {
           return json({ error: "Too many requests, slow down" }, 429);
         }
-        let body: { text?: unknown };
+        let body: { text?: unknown; status?: unknown; priority?: unknown };
         try {
-          body = (await req.json()) as { text?: unknown };
+          body = (await req.json()) as { text?: unknown; status?: unknown; priority?: unknown };
         } catch {
           return json({ error: "Invalid JSON body" }, 400);
         }
@@ -149,7 +154,10 @@ serverRef = Bun.serve({
           return json({ error: "Task text is required" }, 400);
         }
         try {
-          const todo = db.add(body.text);
+          const todo = db.add(body.text, {
+            status: isValidStatus(body.status) ? body.status : undefined,
+            priority: isValidPriority(body.priority) ? body.priority : undefined,
+          });
           broadcastSync();
           return json({ todo }, 201);
         } catch (err) {
@@ -179,16 +187,25 @@ serverRef = Bun.serve({
         if (!checkWriteRateLimit(req)) {
           return json({ error: "Too many requests, slow down" }, 429);
         }
-        let body: { done?: unknown; text?: unknown };
+        let body: {
+          status?: unknown;
+          priority?: unknown;
+          done?: unknown;
+          text?: unknown;
+          position?: unknown;
+        };
         try {
-          body = (await req.json()) as { done?: unknown; text?: unknown };
+          body = (await req.json()) as typeof body;
         } catch {
           return json({ error: "Invalid JSON body" }, 400);
         }
         try {
           const updated = db.update(id, {
+            status: isValidStatus(body.status) ? body.status : undefined,
+            priority: isValidPriority(body.priority) ? body.priority : undefined,
             done: typeof body.done === "boolean" ? body.done : undefined,
             text: typeof body.text === "string" ? body.text : undefined,
+            position: typeof body.position === "number" ? body.position : undefined,
           });
           if (!updated) return json({ error: "Todo not found" }, 404);
           broadcastSync();
@@ -213,8 +230,9 @@ serverRef = Bun.serve({
   },
   websocket: {
     open(ws) {
+      onlineCount++;
       ws.subscribe(WS_TOPIC);
-      ws.send(JSON.stringify({ type: "sync", todos: db.list("all") }));
+      broadcastSync();
     },
     message(ws, message) {
       if (message === "ping") {
@@ -222,9 +240,11 @@ serverRef = Bun.serve({
       }
     },
     close(ws) {
+      onlineCount = Math.max(0, onlineCount - 1);
       ws.unsubscribe(WS_TOPIC);
+      broadcastSync();
     },
   },
 });
 
-console.log(`Shared Todo API + WS + MCP listening on http://0.0.0.0:${serverRef.port} (db: ${DB_PATH})`);
+console.log(`Shared Kanban API + WS + MCP listening on http://0.0.0.0:${serverRef.port} (db: ${DB_PATH})`);
