@@ -1,5 +1,6 @@
 # Todo
 
-A simple, zero-dependency HTML todo app.
+A simple shared HTML todo app backed by a Cloudflare Worker + D1 SQLite database.
 
-Open `index.html` in any browser to use it.
+- **Frontend:** `index.html` (hosted on GitHub Pages)
+- **Backend:** `worker/` (Cloudflare Worker + D1 REST API)

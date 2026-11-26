@@ -1,0 +1,8 @@
+name = "todo-ultra-max-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "todo-ultra-max-db"
+database_id = "e7502ed3-ff8e-46c0-9718-7df135fcc3ac"

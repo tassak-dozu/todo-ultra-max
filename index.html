@@ -15,6 +15,7 @@
       --accent: #7c5cff;
       --accent-hover: #6a48f5;
       --danger: #ef4444;
+      --ok: #22c55e;
       --done: #5c6578;
       --input-bg: #11141a;
     }
@@ -29,6 +30,7 @@
         --accent: #6344f5;
         --accent-hover: #5233e6;
         --danger: #dc2626;
+        --ok: #16a34a;
         --done: #9aa3b5;
         --input-bg: #f8f9fc;
       }
@@ -59,7 +61,7 @@
     header {
       display: flex;
       justify-content: space-between;
-      align-items: baseline;
+      align-items: center;
       margin-bottom: 20px;
     }
 
@@ -69,9 +71,42 @@
       letter-spacing: -0.02em;
     }
 
-    .subtitle {
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       font-size: 0.8rem;
       color: var(--muted);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+
+    .status.online .status-dot {
+      background: var(--ok);
+    }
+
+    .status.error .status-dot {
+      background: var(--danger);
+    }
+
+    .error-banner {
+      display: none;
+      margin-bottom: 12px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: var(--danger);
+      font-size: 0.85rem;
+    }
+
+    .error-banner.visible {
+      display: block;
     }
 
     .card {
@@ -121,6 +156,11 @@
 
     .btn-primary:hover {
       background: var(--accent-hover);
+    }
+
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
     }
 
     .toolbar {
@@ -231,19 +271,25 @@
   <main class="app">
     <header>
       <h1>Todo</h1>
-      <span class="subtitle">Simple todo list</span>
+      <span class="status" id="status" aria-live="polite">
+        <span class="status-dot"></span>
+        <span id="status-text">Connecting...</span>
+      </span>
     </header>
 
-    <section class="card" aria-label="Todo application">
+    <div class="error-banner" id="error-banner" role="alert"></div>
+
+    <section class="card" aria-label="Shared todo application">
       <form class="input-row" id="todo-form">
         <input
           type="text"
           id="todo-input"
-          placeholder="Add a task..."
+          placeholder="Add a shared task..."
+          maxlength="280"
           autocomplete="off"
           aria-label="New task"
         />
-        <button type="submit" class="btn btn-primary">Add</button>
+        <button type="submit" class="btn btn-primary" id="add-btn">Add</button>
       </form>
 
       <div class="toolbar">
@@ -261,29 +307,50 @@
   </main>
 
   <script>
-    const STORAGE_KEY = "simple.todos.v1";
+    const API_BASE = "https://todo-ultra-max-api.mantikafasi.workers.dev";
+    const POLL_MS = 3000;
 
-    let todos = loadTodos();
+    let todos = [];
     let filter = "all";
+    let loading = true;
+    let pendingMutations = 0;
 
     const form = document.getElementById("todo-form");
     const input = document.getElementById("todo-input");
+    const addBtn = document.getElementById("add-btn");
     const list = document.getElementById("todo-list");
     const countEl = document.getElementById("count");
     const clearBtn = document.getElementById("clear-completed");
     const filterBtns = document.querySelectorAll(".filter-btn");
+    const statusEl = document.getElementById("status");
+    const statusText = document.getElementById("status-text");
+    const errorBanner = document.getElementById("error-banner");
 
-    function loadTodos() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        return raw ? JSON.parse(raw) : [];
-      } catch {
-        return [];
-      }
+    function setStatus(state, text) {
+      statusEl.className = `status ${state}`;
+      statusText.textContent = text;
     }
 
-    function saveTodos() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+    function showError(message) {
+      if (!message) {
+        errorBanner.textContent = "";
+        errorBanner.classList.remove("visible");
+        return;
+      }
+      errorBanner.textContent = message;
+      errorBanner.classList.add("visible");
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(`${API_BASE}${path}`, {
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        ...options,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Request failed (${res.status})`);
+      }
+      return data;
     }
 
     function render() {
@@ -297,6 +364,14 @@
       countEl.textContent = `${activeCount} item${activeCount === 1 ? "" : "s"} left`;
 
       list.innerHTML = "";
+
+      if (loading) {
+        const el = document.createElement("li");
+        el.className = "empty";
+        el.textContent = "Loading shared tasks...";
+        list.appendChild(el);
+        return;
+      }
 
       if (visible.length === 0) {
         const empty = document.createElement("li");
@@ -317,7 +392,7 @@
         checkbox.type = "checkbox";
         checkbox.checked = todo.done;
         checkbox.setAttribute("aria-label", `Mark "${todo.text}" as ${todo.done ? "active" : "completed"}`);
-        checkbox.addEventListener("change", () => toggleTodo(todo.id));
+        checkbox.addEventListener("change", () => toggleTodo(todo.id, checkbox.checked));
 
         const span = document.createElement("span");
         span.className = "todo-text";
@@ -335,34 +410,108 @@
       }
     }
 
-    function addTodo(text) {
+    async function fetchTodos() {
+      if (pendingMutations > 0) return;
+      try {
+        const data = await api("/api/todos");
+        todos = Array.isArray(data.todos) ? data.todos : [];
+        loading = false;
+        setStatus("online", "Shared · Live");
+        showError("");
+        render();
+      } catch (err) {
+        loading = false;
+        setStatus("error", "Offline");
+        showError(`Could not reach backend: ${err.message}`);
+        render();
+      }
+    }
+
+    async function addTodo(text) {
       const trimmed = text.trim();
       if (!trimmed) return;
-      todos.unshift({
-        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
-        text: trimmed,
-        done: false,
-      });
-      saveTodos();
-      render();
+      pendingMutations++;
+      addBtn.disabled = true;
+      try {
+        const { todo } = await api("/api/todos", {
+          method: "POST",
+          body: JSON.stringify({ text: trimmed }),
+        });
+        todos.unshift(todo);
+        setStatus("online", "Shared · Live");
+        showError("");
+        render();
+      } catch (err) {
+        showError(`Failed to add task: ${err.message}`);
+      } finally {
+        pendingMutations--;
+        addBtn.disabled = false;
+      }
     }
 
-    function toggleTodo(id) {
-      todos = todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t));
-      saveTodos();
+    async function toggleTodo(id, done) {
+      const prev = todos;
+      todos = todos.map((t) => (t.id === id ? { ...t, done } : t));
       render();
+      pendingMutations++;
+      try {
+        await api(`/api/todos/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ done }),
+        });
+        setStatus("online", "Shared · Live");
+        showError("");
+      } catch (err) {
+        todos = prev;
+        render();
+        showError(`Failed to update task: ${err.message}`);
+      } finally {
+        pendingMutations--;
+      }
     }
 
-    function deleteTodo(id) {
+    async function deleteTodo(id) {
+      const prev = todos;
       todos = todos.filter((t) => t.id !== id);
-      saveTodos();
       render();
+      pendingMutations++;
+      try {
+        await api(`/api/todos/${encodeURIComponent(id)}`, { method: "DELETE" });
+        setStatus("online", "Shared · Live");
+        showError("");
+      } catch (err) {
+        todos = prev;
+        render();
+        showError(`Failed to delete task: ${err.message}`);
+      } finally {
+        pendingMutations--;
+      }
     }
 
-    form.addEventListener("submit", (e) => {
+    async function clearCompleted() {
+      const prev = todos;
+      todos = todos.filter((t) => !t.done);
+      render();
+      pendingMutations++;
+      try {
+        await api("/api/todos?completed=true", { method: "DELETE" });
+        setStatus("online", "Shared · Live");
+        showError("");
+      } catch (err) {
+        todos = prev;
+        render();
+        showError(`Failed to clear completed tasks: ${err.message}`);
+      } finally {
+        pendingMutations--;
+      }
+    }
+
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      addTodo(input.value);
+      const value = input.value;
+      if (!value.trim()) return;
       input.value = "";
+      await addTodo(value);
       input.focus();
     });
 
@@ -374,13 +523,18 @@
       });
     });
 
-    clearBtn.addEventListener("click", () => {
-      todos = todos.filter((t) => !t.done);
-      saveTodos();
-      render();
+    clearBtn.addEventListener("click", clearCompleted);
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) fetchTodos();
     });
 
+    setInterval(() => {
+      if (!document.hidden) fetchTodos();
+    }, POLL_MS);
+
     render();
+    fetchTodos();
   </script>
 </body>
 </html>
