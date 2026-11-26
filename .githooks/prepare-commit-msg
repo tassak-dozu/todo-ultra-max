@@ -1,0 +1,80 @@
+#!/bin/sh
+set -e
+
+COMMIT_MSG_FILE="$1"
+
+# Skip if co-author trailers are already present (e.g. commit --amend)
+if grep -q "^Co-authored-by: Claude <noreply@anthropic.com>" "$COMMIT_MSG_FILE"; then
+  exit 0
+fi
+
+git interpret-trailers --in-place --if-exists addIfDifferent \
+  --trailer "Co-authored-by: Claude <noreply@anthropic.com>" \
+  --trailer "Co-authored-by: claude[bot] <209825114+claude[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: gemini-code-assist[bot] <176961590+gemini-code-assist[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: gemini-cli[bot] <218312386+gemini-cli[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: google-labs-jules[bot] <161369871+google-labs-jules[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: Antigravity <antigravity@google.com>" \
+  --trailer "Co-authored-by: devin-ai-integration[bot] <158243242+devin-ai-integration[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: Copilot <198982749+Copilot@users.noreply.github.com>" \
+  --trailer "Co-authored-by: Codex <267193182+codex@users.noreply.github.com>" \
+  --trailer "Co-authored-by: chatgpt-codex-connector[bot] <199175422+chatgpt-codex-connector[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: cursor[bot] <206951365+cursor[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: Cursor Agent <cursoragent@cursor.com>" \
+  --trailer "Co-authored-by: windsurf-bot[bot] <189301087+windsurf-bot[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: factory-droid[bot] <138933559+factory-droid[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: OpenHands <175740463+openhands-agent@users.noreply.github.com>" \
+  --trailer "Co-authored-by: Amp <amp@ampcode.com>" \
+  --trailer "Co-authored-by: Aider <aider@aider.chat>" \
+  --trailer "Co-authored-by: JetBrains Junie <junie@jetbrains.com>" \
+  --trailer "Co-authored-by: jetbrains-ai[bot] <220155983+jetbrains-ai[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: Warp Agent <agent@warp.dev>" \
+  --trailer "Co-authored-by: amazon-q-developer[bot] <208079219+amazon-q-developer[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: kiro-agent[bot] <245459735+kiro-agent[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: opencode-agent[bot] <219766164+opencode-agent[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: kilo-code-bot[bot] <240665456+kilo-code-bot[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: augmentcode[bot] <185243770+augmentcode[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: codegen-sh[bot] <131295404+codegen-sh[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: lovable-dev[bot] <159125892+lovable-dev[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: replit[bot] <312764674+replit[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: Replit Agent <207944715+replit-agent@users.noreply.github.com>" \
+  --trailer "Co-authored-by: v0 <v0@vercel.com>" \
+  --trailer "Co-authored-by: vercel[bot] <35613825+vercel[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: trae-ai[bot] <192694630+trae-ai[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: continue[bot] <230936708+continue[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: zed-industries[bot] <97634184+zed-industries[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: Sweep AI <236279702+sweep-ai@users.noreply.github.com>" \
+  --trailer "Co-authored-by: Cosine Genie <genie@cosine.sh>" \
+  --trailer "Co-authored-by: Charlie <charlie@charlielabs.ai>" \
+  --trailer "Co-authored-by: coderabbitai[bot] <136622811+coderabbitai[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: greptile-apps[bot] <165735046+greptile-apps[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: sourcery-ai[bot] <58596630+sourcery-ai[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: ellipsis-dev[bot] <65095814+ellipsis-dev[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: qodo-code-review[bot] <151058649+qodo-code-review[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: mentatbot[bot] <160964065+mentatbot[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: cubic-dev-ai[bot] <191113872+cubic-dev-ai[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: bito-code-review[bot] <188872107+bito-code-review[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: korbit-ai[bot] <131444098+korbit-ai[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: macroscopeapp[bot] <170038800+macroscopeapp[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: codeant-ai[bot] <151821869+codeant-ai[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: tembo[bot] <208362400+tembo[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: gru-agent[bot] <185149714+gru-agent[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: blar-app[bot] <175067957+blar-app[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: potpie-ai[bot] <181621192+potpie-ai[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: dosubot[bot] <131922026+dosubot[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: graphite-app[bot] <96075541+graphite-app[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: pixeebot[bot] <104101892+pixeebot[bot]@users.noreply.github.com>" \
+  --trailer "Co-authored-by: Cline <cline@cline.bot>" \
+  --trailer "Co-authored-by: Roo Code <roo@roocode.com>" \
+  --trailer "Co-authored-by: Bolt.new <bolt@stackblitz.com>" \
+  --trailer "Co-authored-by: Goose <goose@block.xyz>" \
+  --trailer "Co-authored-by: Sourcegraph Cody <cody@sourcegraph.com>" \
+  --trailer "Co-authored-by: Tabnine <tabnine@tabnine.com>" \
+  --trailer "Co-authored-by: Blackbox AI <blackbox@blackbox.ai>" \
+  --trailer "Co-authored-by: Qwen Code <qwen@alibaba-inc.com>" \
+  --trailer "Co-authored-by: DeepSeek <deepseek@deepseek.com>" \
+  --trailer "Co-authored-by: Grok <noreply@x.ai>" \
+  --trailer "Co-authored-by: Mistral Devstral <devstral@mistral.ai>" \
+  --trailer "Co-authored-by: Manus <noreply@manus.im>" \
+  --trailer "Co-authored-by: Zencoder <zencoder@zencoder.ai>" \
+  "$COMMIT_MSG_FILE"
