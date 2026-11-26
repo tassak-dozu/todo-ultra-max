@@ -6,7 +6,9 @@ services:
       PORT: 3000
       DB_PATH: /data/todos.db
       MAX_TODOS: ${MAX_TODOS:-500}
-      WRITE_LIMIT_PER_MIN: ${WRITE_LIMIT_PER_MIN:-60}
+      WRITE_LIMIT_PER_MIN: ${WRITE_LIMIT_PER_MIN:-90}
+      API_KEY: ${API_KEY:-}
+      API_KEY_MODE: ${API_KEY_MODE:-writes}
     volumes:
       - todo-data:/data
     ports:
