@@ -389,6 +389,166 @@
       box-shadow: 0 0 18px rgba(244, 63, 94, 0.18);
     }
 
+    .wallet-btn {
+      border-color: rgba(245, 158, 11, 0.45);
+      color: #fbbf24;
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.14), rgba(139, 92, 246, 0.12));
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.16);
+    }
+
+    .wallet-btn:hover {
+      border-color: rgba(251, 191, 36, 0.75);
+      box-shadow: 0 0 26px rgba(245, 158, 11, 0.3);
+    }
+
+    /* Card Prediction Market Strip */
+    .card-market {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 10px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(8, 10, 18, 0.55);
+      border: 1px solid rgba(245, 158, 11, 0.22);
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    html[data-theme="light"] .card-market {
+      background: rgba(245, 158, 11, 0.06);
+    }
+
+    .card-market:hover {
+      border-color: rgba(251, 191, 36, 0.55);
+      box-shadow: 0 0 18px rgba(245, 158, 11, 0.16);
+    }
+
+    .market-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .market-pot {
+      color: #fbbf24;
+      font-weight: 700;
+    }
+
+    .market-bar {
+      display: flex;
+      height: 5px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.07);
+      gap: 1px;
+    }
+
+    .mb-speedrun { background: #22d3ee; }
+    .mb-today { background: #f59e0b; }
+    .mb-eventually { background: #a78bfa; }
+    .mb-never { background: #f43f5e; }
+
+    /* Prediction Market Modal */
+    .bucket-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .bucket-card {
+      text-align: left;
+      padding: 11px 12px;
+      border-radius: 12px;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+
+    .bucket-card:hover:not(:disabled) {
+      border-color: rgba(251, 191, 36, 0.55);
+      transform: translateY(-1px);
+    }
+
+    .bucket-card.selected {
+      border-color: #fbbf24;
+      background: rgba(245, 158, 11, 0.14);
+      box-shadow: 0 0 22px rgba(245, 158, 11, 0.22);
+    }
+
+    .bucket-card:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+      text-decoration: line-through;
+    }
+
+    .bucket-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .bucket-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .chip-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .chip-btn {
+      padding: 5px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--input-bg);
+      color: #fbbf24;
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .chip-btn:hover { border-color: #fbbf24; }
+
+    .mini-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 150px;
+      overflow-y: auto;
+      margin-top: 10px;
+    }
+
+    .mini-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 9px;
+      border-radius: 9px;
+      background: var(--input-bg);
+      font-size: 0.76rem;
+    }
+
+    .bet-won { color: #34d399; font-weight: 700; }
+    .bet-lost { color: #fb7185; font-weight: 700; }
+    .bet-open { color: #fbbf24; font-weight: 700; }
+
     /* Telemetry Strip */
     .telemetry-strip {
       display: flex;
@@ -1280,6 +1440,7 @@
           <button type="button" class="seg-btn active" data-view="kanban" role="tab">Kanban</button>
           <button type="button" class="seg-btn" data-view="list" role="tab">List</button>
         </div>
+        <button type="button" class="ghost-btn wallet-btn mono" id="wallet-btn" title="Aura Coins & Degenerate Leaderboard">🪙 1,000</button>
         <button type="button" class="ghost-btn key-btn" id="key-btn">🔑 API Key</button>
         <button type="button" class="ghost-btn" id="mcp-btn">🤖 MCP</button>
         <button type="button" class="ghost-btn" id="theme-btn" aria-label="Toggle theme">☀️ Flashbang</button>
@@ -1454,6 +1615,55 @@
     </div>
   </div>
 
+  <!-- Prediction Market Modal -->
+  <div class="modal-backdrop" id="bet-modal" role="dialog" aria-modal="true" aria-labelledby="bet-title">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="bet-title">🎰 Prediction Market</h2>
+        <button type="button" class="icon-btn" id="bet-close">&times;</button>
+      </div>
+      <p id="bet-card-info" style="margin-bottom:10px;color:var(--text);font-weight:600"></p>
+      <div class="bucket-grid" id="bucket-grid"></div>
+      <div class="chip-row">
+        <button type="button" class="chip-btn" data-chip="50">+50 🪙</button>
+        <button type="button" class="chip-btn" data-chip="100">+100 🪙</button>
+        <button type="button" class="chip-btn" data-chip="250">+250 🪙</button>
+        <button type="button" class="chip-btn" data-chip="all">ALL IN 💀</button>
+      </div>
+      <div class="field-row">
+        <input type="number" id="bet-amount" min="10" step="10" value="100" placeholder="Wager amount..." />
+        <button type="button" class="add-btn" id="bet-submit">Place Bet 🎰</button>
+      </div>
+      <div class="key-feedback" id="bet-feedback"></div>
+      <div class="activity-head" style="margin-top:8px"><span>Recent Bets on This Card</span></div>
+      <div class="mini-list" id="bet-recent-list"></div>
+    </div>
+  </div>
+
+  <!-- Wallet & Leaderboard Modal -->
+  <div class="modal-backdrop" id="wallet-modal" role="dialog" aria-modal="true" aria-labelledby="wallet-title">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="wallet-title">🏆 Degen Wallet &amp; Leaderboard</h2>
+        <button type="button" class="icon-btn" id="wallet-close">&times;</button>
+      </div>
+      <div class="field-row">
+        <input type="text" id="player-name-input" maxlength="24" placeholder="Your gambler tag..." />
+        <button type="button" class="ghost-btn" id="player-name-save">Save Tag</button>
+      </div>
+      <div class="telemetry-strip" style="margin-bottom:10px">
+        <span class="stat-chip">Balance <strong class="mono" id="wallet-bal">1,000 🪙</strong></span>
+        <span class="stat-chip">Record <strong class="mono" id="wallet-record">0W / 0L</strong></span>
+        <button type="button" class="ghost-btn" id="bailout-btn">💸 Bailout (+500)</button>
+      </div>
+      <div class="key-feedback" id="wallet-feedback"></div>
+      <div class="activity-head"><span>👑 Richest Degens</span></div>
+      <div class="mini-list" id="leaderboard-list"></div>
+      <div class="activity-head" style="margin-top:12px"><span>🎟️ Your Bets</span></div>
+      <div class="mini-list" id="my-bets-list"></div>
+    </div>
+  </div>
+
   <!-- MCP Modal -->
   <div class="modal-backdrop" id="mcp-modal" role="dialog" aria-modal="true" aria-labelledby="mcp-title">
     <div class="modal">
@@ -1478,6 +1688,26 @@
     const STATUS_ORDER = ["todo", "in_progress", "done"];
     const STATUS_LABELS = { todo: "Procrastinating", in_progress: "Actually Cooking", done: "Certified Done" };
     const PRIO_LABELS = { low: "low · chill", medium: "med · soon™", high: "high · cooked" };
+    const BUCKET_ORDER = ["speedrun", "today", "eventually", "never"];
+    const BUCKET_META = {
+      speedrun: { label: "⚡ < 5 min", maxMs: 5 * 60 * 1000 },
+      today: { label: "🔥 5m – 1h", maxMs: 60 * 60 * 1000 },
+      eventually: { label: "🐢 1h – 24h", maxMs: 24 * 60 * 60 * 1000 },
+      never: { label: "💀 24h+ / Nuked", maxMs: Infinity },
+    };
+
+    let playerId = localStorage.getItem("board.playerId");
+    if (!playerId) {
+      playerId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random())).slice(0, 16);
+      localStorage.setItem("board.playerId", playerId);
+    }
+    let playerName = localStorage.getItem("board.playerName") || `Degen#${playerId.slice(0, 4)}`;
+    let wallet = { playerId, name: playerName, balance: 1000, wins: 0, losses: 0, totalWon: 0 };
+    let myBets = [];
+    let markets = {};
+    let leaderboard = [];
+    let activeBetCardId = null;
+    let selectedBucket = "speedrun";
 
     let apiKey = localStorage.getItem("board.apiKey") || "";
     let authMode = "none";
@@ -1953,7 +2183,57 @@
       }
 
       footer.append(timeEl, actions);
-      card.append(top, textEl, footer);
+
+      if (todo.status !== "done") {
+        const market = markets[todo.id];
+        const mBox = document.createElement("div");
+        mBox.className = "card-market";
+        mBox.title = "Click to bet Aura Coins on when this card finishes";
+        mBox.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openBetModal(todo.id);
+        });
+
+        const row = document.createElement("div");
+        row.className = "market-row";
+        const pot = document.createElement("span");
+        pot.className = "market-pot mono";
+        const lead = document.createElement("span");
+
+        if (market && market.totalPool > 0) {
+          pot.textContent = `🎰 ${market.totalPool.toLocaleString()} 🪙 (${market.betCount})`;
+          let topB = "speedrun";
+          for (const b of BUCKET_ORDER) {
+            if ((market.pools[b] || 0) > (market.pools[topB] || 0)) topB = b;
+          }
+          const pct = Math.round(((market.pools[topB] || 0) / market.totalPool) * 100);
+          lead.textContent = `${pct}% ${BUCKET_META[topB].label}`;
+        } else {
+          pot.textContent = "🎰 Bet on ETA";
+          lead.textContent = "Open market →";
+        }
+        row.append(pot, lead);
+        mBox.appendChild(row);
+
+        if (market && market.totalPool > 0) {
+          const bar = document.createElement("div");
+          bar.className = "market-bar";
+          for (const b of BUCKET_ORDER) {
+            const v = market.pools[b] || 0;
+            if (v > 0) {
+              const seg = document.createElement("div");
+              seg.className = `mb-${b}`;
+              seg.style.width = `${(v / market.totalPool) * 100}%`;
+              bar.appendChild(seg);
+            }
+          }
+          mBox.appendChild(bar);
+        }
+
+        card.append(top, textEl, mBox, footer);
+      } else {
+        card.append(top, textEl, footer);
+      }
       return card;
     }
 
@@ -2207,11 +2487,16 @@
           }
 
           if (msg.type === "sync" && Array.isArray(msg.todos)) {
+            if (msg.markets && typeof msg.markets === "object") markets = msg.markets;
+            if (Array.isArray(msg.leaderboard)) leaderboard = msg.leaderboard;
             if (Array.isArray(msg.activity)) activity = msg.activity;
+            if (msg.resolution) {
+              fetchWallet();
+            }
             if (msg.lastEvent && msg.lastEvent.id !== lastEventId) {
               lastEventId = msg.lastEvent.id;
               flashCardId = msg.lastEvent.cardId || null;
-              if (pendingMutations === 0) {
+              if (pendingMutations === 0 || msg.resolution) {
                 showToast(msg.lastEvent.summary, msg.lastEvent.source);
               }
             }
@@ -2222,6 +2507,8 @@
             }
             renderPresence();
             renderActivity();
+            if (activeBetCardId && betModal.classList.contains("open")) renderBetModal();
+            if (walletModal.classList.contains("open")) renderWalletModal();
           }
         } catch {}
       });
@@ -2262,6 +2549,8 @@
       try {
         const data = await api("/api/todos");
         todos = Array.isArray(data.todos) ? data.todos.map(normalizeTodo) : [];
+        if (data.markets && typeof data.markets === "object") markets = data.markets;
+        if (Array.isArray(data.leaderboard)) leaderboard = data.leaderboard;
         if (typeof data.online === "number") onlineCount = data.online;
         if (Array.isArray(data.peers)) peers = data.peers;
         if (typeof data.mcpCalls === "number") mcpCalls = data.mcpCalls;
@@ -2413,6 +2702,267 @@
         mcpModal.classList.remove("open");
         keyModal.classList.remove("open");
         supportPanel.classList.remove("open");
+        betModal.classList.remove("open");
+        walletModal.classList.remove("open");
+      }
+    });
+
+    // Prediction Gambling UI
+    const walletBtn = document.getElementById("wallet-btn");
+    const walletModal = document.getElementById("wallet-modal");
+    const walletClose = document.getElementById("wallet-close");
+    const playerNameInput = document.getElementById("player-name-input");
+    const playerNameSave = document.getElementById("player-name-save");
+    const walletBalEl = document.getElementById("wallet-bal");
+    const walletRecordEl = document.getElementById("wallet-record");
+    const bailoutBtn = document.getElementById("bailout-btn");
+    const walletFeedback = document.getElementById("wallet-feedback");
+    const leaderboardListEl = document.getElementById("leaderboard-list");
+    const myBetsListEl = document.getElementById("my-bets-list");
+
+    const betModal = document.getElementById("bet-modal");
+    const betClose = document.getElementById("bet-close");
+    const betCardInfo = document.getElementById("bet-card-info");
+    const bucketGrid = document.getElementById("bucket-grid");
+    const betAmountInput = document.getElementById("bet-amount");
+    const betSubmit = document.getElementById("bet-submit");
+    const betFeedback = document.getElementById("bet-feedback");
+    const betRecentList = document.getElementById("bet-recent-list");
+
+    function updateWalletPill() {
+      walletBtn.textContent = `🪙 ${wallet.balance.toLocaleString()}`;
+    }
+
+    async function fetchWallet() {
+      try {
+        const data = await api(
+          `/api/wallet?playerId=${encodeURIComponent(playerId)}&name=${encodeURIComponent(playerName)}`
+        );
+        if (data.wallet) wallet = data.wallet;
+        if (Array.isArray(data.bets)) myBets = data.bets;
+        if (Array.isArray(data.leaderboard)) leaderboard = data.leaderboard;
+        updateWalletPill();
+        if (walletModal.classList.contains("open")) renderWalletModal();
+      } catch {}
+    }
+
+    function renderWalletModal() {
+      playerNameInput.value = wallet.name || playerName;
+      walletBalEl.textContent = `${wallet.balance.toLocaleString()} 🪙`;
+      walletRecordEl.textContent = `${wallet.wins}W / ${wallet.losses}L`;
+      bailoutBtn.disabled = wallet.balance >= 100;
+
+      leaderboardListEl.innerHTML = "";
+      if (leaderboard.length === 0) {
+        const d = document.createElement("div");
+        d.className = "mini-row";
+        d.textContent = "Nobody has gambled yet — be the first degen!";
+        leaderboardListEl.appendChild(d);
+      } else {
+        leaderboard.forEach((w, i) => {
+          const row = document.createElement("div");
+          row.className = "mini-row";
+          const left = document.createElement("span");
+          const medal = i === 0 ? "🥇 " : i === 1 ? "🥈 " : i === 2 ? "🥉 " : `#${i + 1} `;
+          left.textContent = `${medal}${w.name}${w.playerId === playerId ? " (you)" : ""}`;
+          const right = document.createElement("span");
+          right.className = "mono";
+          right.style.color = "#fbbf24";
+          right.textContent = `${w.balance.toLocaleString()} 🪙 (${w.wins}W/${w.losses}L)`;
+          row.append(left, right);
+          leaderboardListEl.appendChild(row);
+        });
+      }
+
+      myBetsListEl.innerHTML = "";
+      if (myBets.length === 0) {
+        const d = document.createElement("div");
+        d.className = "mini-row";
+        d.textContent = "No bets placed yet. Click 🎰 on any card!";
+        myBetsListEl.appendChild(d);
+      } else {
+        for (const b of myBets) {
+          const row = document.createElement("div");
+          row.className = "mini-row";
+          const left = document.createElement("span");
+          left.textContent = `${BUCKET_META[b.bucket]?.label || b.bucket} · "${b.cardText.slice(0, 24)}"`;
+          const right = document.createElement("span");
+          right.className = `mono bet-${b.status}`;
+          right.textContent =
+            b.status === "won"
+              ? `WON +${b.payout} 🪙`
+              : b.status === "lost"
+                ? `LOST -${b.amount} 🪙`
+                : `OPEN ${b.amount} 🪙`;
+          row.append(left, right);
+          myBetsListEl.appendChild(row);
+        }
+      }
+    }
+
+    function openBetModal(cardId) {
+      activeBetCardId = cardId;
+      betFeedback.textContent = "";
+      betFeedback.className = "key-feedback";
+      const card = todos.find((t) => t.id === cardId);
+      if (!card) return;
+      const elapsed = Date.now() - card.createdAt;
+      // Default to first non-expired bucket
+      selectedBucket = BUCKET_ORDER.find((b) => elapsed < BUCKET_META[b].maxMs) || "never";
+      renderBetModal();
+      betModal.classList.add("open");
+    }
+
+    function renderBetModal() {
+      const card = todos.find((t) => t.id === activeBetCardId);
+      if (!card || card.status === "done") {
+        betModal.classList.remove("open");
+        return;
+      }
+      const elapsed = Math.max(0, Date.now() - card.createdAt);
+      const market = markets[card.id] || {
+        totalPool: 0,
+        betCount: 0,
+        pools: { speedrun: 0, today: 0, eventually: 0, never: 0 },
+        recentBets: [],
+      };
+
+      betCardInfo.textContent = `"${card.text}" · ⏱ open ${relativeTime(card.createdAt)} · Balance: ${wallet.balance.toLocaleString()} 🪙`;
+      bucketGrid.innerHTML = "";
+
+      for (const b of BUCKET_ORDER) {
+        const expired = elapsed >= BUCKET_META[b].maxMs;
+        const pool = market.pools[b] || 0;
+        const pct = market.totalPool > 0 ? Math.round((pool / market.totalPool) * 100) : 0;
+        const estMult =
+          pool > 0 && market.totalPool > 0
+            ? Math.max(1.5, market.totalPool / pool).toFixed(1)
+            : "1.5+";
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `bucket-card${selectedBucket === b && !expired ? " selected" : ""}`;
+        btn.disabled = expired;
+        btn.addEventListener("click", () => {
+          selectedBucket = b;
+          renderBetModal();
+        });
+
+        const top = document.createElement("div");
+        top.className = "bucket-top";
+        top.innerHTML = `<span>${BUCKET_META[b].label}</span><span class="mono" style="color:#fbbf24">${expired ? "LOCKED" : `${estMult}x`}</span>`;
+
+        const meta = document.createElement("div");
+        meta.className = "bucket-meta mono";
+        meta.innerHTML = `<span>${pool.toLocaleString()} 🪙</span><span>${pct}%</span>`;
+
+        btn.append(top, meta);
+        bucketGrid.appendChild(btn);
+      }
+
+      betRecentList.innerHTML = "";
+      if (market.recentBets.length === 0) {
+        const d = document.createElement("div");
+        d.className = "mini-row";
+        d.textContent = "Pool is empty — set the opening odds!";
+        betRecentList.appendChild(d);
+      } else {
+        for (const rb of market.recentBets) {
+          const row = document.createElement("div");
+          row.className = "mini-row";
+          const left = document.createElement("span");
+          left.textContent = `${rb.playerName} → ${BUCKET_META[rb.bucket]?.label || rb.bucket}`;
+          const right = document.createElement("span");
+          right.className = "mono";
+          right.style.color = "#fbbf24";
+          right.textContent = `${rb.amount.toLocaleString()} 🪙`;
+          row.append(left, right);
+          betRecentList.appendChild(row);
+        }
+      }
+    }
+
+    walletBtn.addEventListener("click", async () => {
+      walletFeedback.textContent = "";
+      walletModal.classList.add("open");
+      await fetchWallet();
+      renderWalletModal();
+    });
+    walletClose.addEventListener("click", () => walletModal.classList.remove("open"));
+    walletModal.addEventListener("click", (e) => {
+      if (e.target === walletModal) walletModal.classList.remove("open");
+    });
+
+    playerNameSave.addEventListener("click", async () => {
+      const next = playerNameInput.value.trim().slice(0, 24);
+      if (!next) return;
+      playerName = next;
+      localStorage.setItem("board.playerName", playerName);
+      await fetchWallet();
+      walletFeedback.className = "key-feedback ok";
+      walletFeedback.textContent = `Gambler tag updated to "${wallet.name}"!`;
+    });
+
+    bailoutBtn.addEventListener("click", async () => {
+      try {
+        const res = await api("/api/wallet/bailout", {
+          method: "POST",
+          body: JSON.stringify({ playerId, name: playerName }),
+        });
+        wallet = res.wallet;
+        updateWalletPill();
+        renderWalletModal();
+        walletFeedback.className = "key-feedback ok";
+        walletFeedback.textContent = `Emergency bailout secured: +${res.granted} 🪙!`;
+      } catch (err) {
+        walletFeedback.className = "key-feedback err";
+        walletFeedback.textContent = err.message;
+      }
+    });
+
+    betClose.addEventListener("click", () => betModal.classList.remove("open"));
+    betModal.addEventListener("click", (e) => {
+      if (e.target === betModal) betModal.classList.remove("open");
+    });
+
+    document.querySelectorAll(".chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const v = btn.dataset.chip;
+        betAmountInput.value = v === "all" ? String(Math.max(10, wallet.balance)) : v;
+      });
+    });
+
+    betSubmit.addEventListener("click", async () => {
+      const amount = Number(betAmountInput.value);
+      if (!activeBetCardId || !Number.isFinite(amount) || amount < 10) {
+        betFeedback.className = "key-feedback err";
+        betFeedback.textContent = "Minimum wager is 10 🪙!";
+        return;
+      }
+      betSubmit.disabled = true;
+      try {
+        const res = await api("/api/bets", {
+          method: "POST",
+          body: JSON.stringify({
+            playerId,
+            playerName,
+            cardId: activeBetCardId,
+            bucket: selectedBucket,
+            amount,
+          }),
+        });
+        wallet = res.wallet;
+        if (Array.isArray(res.bets)) myBets = res.bets;
+        updateWalletPill();
+        betFeedback.className = "key-feedback ok";
+        betFeedback.textContent = `Locked in ${res.bet.amount} 🪙 on ${BUCKET_META[res.bet.bucket].label}!`;
+        await fetchTodos();
+        renderBetModal();
+      } catch (err) {
+        betFeedback.className = "key-feedback err";
+        betFeedback.textContent = err.message;
+      } finally {
+        betSubmit.disabled = false;
       }
     });
 
@@ -2537,8 +3087,10 @@
     }, 15000);
 
     updateKeyButton();
+    updateWalletPill();
     render();
     verifyApiKey(false);
+    fetchWallet();
     fetchTodos();
     connectWebSocket();
   </script>

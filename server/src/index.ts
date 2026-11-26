@@ -1,5 +1,12 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { TodoDB, isValidPriority, isValidStatus } from "./db";
+import {
+  BUCKET_LABELS,
+  TodoDB,
+  isValidBucket,
+  isValidPriority,
+  isValidStatus,
+  type ResolutionSummary,
+} from "./db";
 import { handleMcpPayload } from "./mcp";
 
 const PORT = Number(process.env.PORT || 3000);
@@ -24,7 +31,7 @@ const PEER_COLORS = ["#a78bfa", "#22d3ee", "#34d399", "#fbbf24", "#fb7185", "#60
 
 interface ActivityEvent {
   id: string;
-  action: "added" | "moved" | "edited" | "deleted" | "cleared";
+  action: "added" | "moved" | "edited" | "deleted" | "cleared" | "bet" | "settled";
   source: "web" | "mcp";
   summary: string;
   cardId?: string;
@@ -80,11 +87,10 @@ function recordActivity(event: Omit<ActivityEvent, "id" | "at">): ActivityEvent 
     ...event,
   };
   activityLog.unshift(full);
-  if (activityLog.length > 20) activityLog.length = 20;
+  if (activityLog.length > 25) activityLog.length = 25;
   return full;
 }
 
-// Simple in-memory per-IP write rate limiter
 const writeBuckets = new Map<string, { count: number; resetAt: number }>();
 
 function checkWriteRateLimit(req: Request): boolean {
@@ -133,16 +139,19 @@ function getPresencePayload() {
   };
 }
 
-function broadcastSync(lastEvent?: ActivityEvent) {
+function broadcastSync(lastEvent?: ActivityEvent, resolution?: ResolutionSummary | null) {
   if (!serverRef) return;
   const payload = JSON.stringify({
     type: "sync",
     todos: db.list(),
+    markets: db.getMarketsMap(),
+    leaderboard: db.getLeaderboard(10),
     ...getPresencePayload(),
     authMode: API_KEY_MODE,
     mcpCalls,
-    activity: activityLog.slice(0, 12),
+    activity: activityLog.slice(0, 15),
     lastEvent: lastEvent ?? null,
+    resolution: resolution ?? null,
   });
   serverRef.publish(WS_TOPIC, payload);
 }
@@ -156,6 +165,20 @@ function broadcastPresence() {
   serverRef.publish(WS_TOPIC, payload);
 }
 
+function recordResolutionActivity(res: ResolutionSummary, source: "web" | "mcp"): ActivityEvent {
+  const label = BUCKET_LABELS[res.winningBucket];
+  const summary =
+    res.winnerCount > 0
+      ? `🎰 "${res.cardText.slice(0, 28)}" settled → ${label} WON! Paid ${res.totalPaid} 🪙`
+      : `🎰 "${res.cardText.slice(0, 28)}" settled → ${label} (house swept ${res.totalPool} 🪙)`;
+  return recordActivity({
+    action: "settled",
+    source,
+    summary,
+    cardId: res.cardId,
+  });
+}
+
 serverRef = Bun.serve<PeerState>({
   port: PORT,
   async fetch(req, server) {
@@ -166,7 +189,7 @@ serverRef = Bun.serve<PeerState>({
     const url = new URL(req.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
 
-    // Health check (always public)
+    // Health check
     if (path === "/api/health" && req.method === "GET") {
       return json({
         ok: true,
@@ -177,7 +200,7 @@ serverRef = Bun.serve<PeerState>({
       });
     }
 
-    // Verify API key status
+    // Verify API key
     if (path === "/api/auth/verify" && req.method === "GET") {
       const provided = extractApiKey(req, url);
       const valid = isKeyValid(provided);
@@ -192,7 +215,7 @@ serverRef = Bun.serve<PeerState>({
       );
     }
 
-    // WebSocket endpoint for live sync
+    // WebSocket endpoint
     if (path === "/ws") {
       if (!authorize(req, url, false)) {
         return json({ error: "API key required" }, 401);
@@ -207,6 +230,113 @@ serverRef = Bun.serve<PeerState>({
         return undefined;
       }
       return json({ error: "Expected WebSocket upgrade" }, 426);
+    }
+
+    // Prediction Gambling: Wallet & Leaderboard
+    if (path === "/api/wallet" && req.method === "GET") {
+      if (!authorize(req, url, false)) {
+        return json({ error: "API key required" }, 401);
+      }
+      const playerId = url.searchParams.get("playerId") || "";
+      const name = url.searchParams.get("name") || undefined;
+      if (!playerId) return json({ error: "playerId required" }, 400);
+      const wallet = db.getOrCreateWallet(playerId, name);
+      return json({
+        wallet,
+        bets: db.getPlayerBets(wallet.playerId, 20),
+        leaderboard: db.getLeaderboard(10),
+      });
+    }
+
+    if (path === "/api/wallet/bailout" && req.method === "POST") {
+      if (!authorize(req, url, true)) {
+        return json({ error: "API key required" }, 401);
+      }
+      let body: { playerId?: unknown; name?: unknown };
+      try {
+        body = (await req.json()) as typeof body;
+      } catch {
+        return json({ error: "Invalid JSON body" }, 400);
+      }
+      if (typeof body?.playerId !== "string") {
+        return json({ error: "playerId required" }, 400);
+      }
+      try {
+        const res = db.bailoutWallet(
+          body.playerId,
+          typeof body.name === "string" ? body.name : undefined
+        );
+        const ev = recordActivity({
+          action: "bet",
+          source: "web",
+          summary: `💸 ${res.wallet.name} begged for a +${res.granted} 🪙 bailout`,
+        });
+        broadcastSync(ev);
+        return json(res);
+      } catch (err) {
+        return json({ error: err instanceof Error ? err.message : "Bailout denied" }, 400);
+      }
+    }
+
+    if (path === "/api/leaderboard" && req.method === "GET") {
+      if (!authorize(req, url, false)) {
+        return json({ error: "API key required" }, 401);
+      }
+      return json({ leaderboard: db.getLeaderboard(10), markets: db.getMarketsMap() });
+    }
+
+    if (path === "/api/bets" && req.method === "POST") {
+      if (!authorize(req, url, true)) {
+        return json({ error: "API key required to gamble" }, 401);
+      }
+      if (!checkWriteRateLimit(req)) {
+        return json({ error: "Chill out degenerate, rate limit hit" }, 429);
+      }
+      let body: {
+        playerId?: unknown;
+        playerName?: unknown;
+        cardId?: unknown;
+        bucket?: unknown;
+        amount?: unknown;
+      };
+      try {
+        body = (await req.json()) as typeof body;
+      } catch {
+        return json({ error: "Invalid JSON body" }, 400);
+      }
+      if (
+        typeof body?.playerId !== "string" ||
+        typeof body?.cardId !== "string" ||
+        !isValidBucket(body?.bucket) ||
+        typeof body?.amount !== "number"
+      ) {
+        return json({ error: "Required: playerId, cardId, bucket, amount" }, 400);
+      }
+      try {
+        const placed = db.placeBet({
+          playerId: body.playerId,
+          playerName: typeof body.playerName === "string" ? body.playerName : undefined,
+          cardId: body.cardId,
+          bucket: body.bucket,
+          amount: body.amount,
+        });
+        const ev = recordActivity({
+          action: "bet",
+          source: "web",
+          summary: `🎰 ${placed.wallet.name} bet ${placed.bet.amount} 🪙 on ${BUCKET_LABELS[placed.bet.bucket]} for "${placed.bet.cardText.slice(0, 26)}"`,
+          cardId: placed.bet.cardId,
+        });
+        broadcastSync(ev);
+        return json(
+          {
+            ...placed,
+            bets: db.getPlayerBets(placed.wallet.playerId, 20),
+          },
+          201
+        );
+      } catch (err) {
+        return json({ error: err instanceof Error ? err.message : "Bet failed" }, 400);
+      }
     }
 
     // Streamable HTTP MCP endpoint
@@ -247,7 +377,8 @@ serverRef = Bun.serve<PeerState>({
             ? ((payload as { params?: { arguments?: Record<string, unknown> } }).params?.arguments ?? {})
             : {};
 
-        const isWriteTool = method === "tools/call" && toolName !== "list_todos";
+        const isWriteTool =
+          method === "tools/call" && toolName !== "list_todos" && toolName !== "get_leaderboard";
 
         if (!authorize(req, url, isWriteTool)) {
           return json(
@@ -273,17 +404,20 @@ serverRef = Bun.serve<PeerState>({
 
         if (method === "tools/call") mcpCalls++;
 
-        const { status, body } = handleMcpPayload(payload, db, () => {
+        const { status, body } = handleMcpPayload(payload, db, (info) => {
           let action: ActivityEvent["action"] = "edited";
-          let summary = `MCP ran ${toolName}`;
-          let cardId = typeof toolArgs.id === "string" ? toolArgs.id : undefined;
+          let summary = info?.customSummary || `Robot ran ${toolName}`;
+          const cardId = info?.cardId || (typeof toolArgs.id === "string" ? toolArgs.id : undefined);
 
-          if (toolName === "add_todo") {
+          if (info?.customSummary) {
+            action = "bet";
+          } else if (toolName === "add_todo") {
             action = "added";
             summary = `Robot spawned "${String(toolArgs.text || "").slice(0, 48)}"`;
           } else if (toolName === "move_todo" || toolName === "toggle_todo") {
             action = "moved";
-            const dest = typeof toolArgs.status === "string" ? toolArgs.status.replace("_", " ") : "updated";
+            const dest =
+              typeof toolArgs.status === "string" ? toolArgs.status.replace("_", " ") : "updated";
             summary = `Robot shoved a card → ${dest}`;
           } else if (toolName === "delete_todo") {
             action = "deleted";
@@ -292,8 +426,12 @@ serverRef = Bun.serve<PeerState>({
             action = "cleared";
             summary = "Robot nuked the Done column";
           }
-          const ev = recordActivity({ action, source: "mcp", summary, cardId });
-          broadcastSync(ev);
+
+          let ev = recordActivity({ action, source: "mcp", summary, cardId });
+          if (info?.resolution) {
+            ev = recordResolutionActivity(info.resolution, "mcp");
+          }
+          broadcastSync(ev, info?.resolution);
         });
 
         if (body === null) {
@@ -312,10 +450,12 @@ serverRef = Bun.serve<PeerState>({
         }
         return json({
           todos: db.list(),
+          markets: db.getMarketsMap(),
+          leaderboard: db.getLeaderboard(10),
           ...getPresencePayload(),
           authMode: API_KEY_MODE,
           mcpCalls,
-          activity: activityLog.slice(0, 12),
+          activity: activityLog.slice(0, 15),
         });
       }
 
@@ -402,17 +542,18 @@ serverRef = Bun.serve<PeerState>({
         }
         try {
           const before = db.get(id);
-          const updated = db.update(id, {
+          const res = db.update(id, {
             status: isValidStatus(body.status) ? body.status : undefined,
             priority: isValidPriority(body.priority) ? body.priority : undefined,
             done: typeof body.done === "boolean" ? body.done : undefined,
             text: typeof body.text === "string" ? body.text : undefined,
             position: typeof body.position === "number" ? body.position : undefined,
           });
-          if (!updated) return json({ error: "Todo not found" }, 404);
+          if (!res) return json({ error: "Todo not found" }, 404);
 
+          const updated = res.todo;
           const moved = before && before.status !== updated.status;
-          const ev = recordActivity({
+          let ev = recordActivity({
             action: moved ? "moved" : "edited",
             source: "web",
             summary: moved
@@ -420,8 +561,11 @@ serverRef = Bun.serve<PeerState>({
               : `Rewrote "${updated.text.slice(0, 44)}"`,
             cardId: updated.id,
           });
-          broadcastSync(ev);
-          return json({ todo: updated });
+          if (res.resolution) {
+            ev = recordResolutionActivity(res.resolution, "web");
+          }
+          broadcastSync(ev, res.resolution);
+          return json({ todo: updated, resolution: res.resolution });
         } catch (err) {
           return json({ error: err instanceof Error ? err.message : "Bad request" }, 400);
         }
@@ -435,16 +579,19 @@ serverRef = Bun.serve<PeerState>({
           return json({ error: "Too many requests, slow down" }, 429);
         }
         const before = db.get(id);
-        const ok = db.delete(id);
-        if (!ok) return json({ error: "Todo not found" }, 404);
-        const ev = recordActivity({
+        const res = db.delete(id);
+        if (!res.deleted) return json({ error: "Todo not found" }, 404);
+        let ev = recordActivity({
           action: "deleted",
           source: "web",
           summary: before ? `Yeeted "${before.text.slice(0, 44)}"` : "Yeeted a card into the void",
           cardId: id,
         });
-        broadcastSync(ev);
-        return json({ deleted: id });
+        if (res.resolution) {
+          ev = recordResolutionActivity(res.resolution, "web");
+        }
+        broadcastSync(ev, res.resolution);
+        return json({ deleted: id, resolution: res.resolution });
       }
     }
 
@@ -470,7 +617,12 @@ serverRef = Bun.serve<PeerState>({
         return;
       }
       try {
-        const msg = JSON.parse(text) as { type?: string; t?: number; active?: boolean; cardId?: string | null };
+        const msg = JSON.parse(text) as {
+          type?: string;
+          t?: number;
+          active?: boolean;
+          cardId?: string | null;
+        };
         if (msg.type === "ping") {
           ws.send(JSON.stringify({ type: "pong", t: msg.t ?? Date.now() }));
           return;
@@ -501,5 +653,5 @@ serverRef = Bun.serve<PeerState>({
 });
 
 console.log(
-  `Shared Kanban API + WS + MCP listening on http://0.0.0.0:${serverRef.port} (db: ${DB_PATH}, auth: ${API_KEY_MODE})`
+  `Shared Kanban + Prediction Market + WS + MCP listening on http://0.0.0.0:${serverRef.port} (db: ${DB_PATH}, auth: ${API_KEY_MODE})`
 );

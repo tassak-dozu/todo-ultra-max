@@ -21,7 +21,8 @@
 - 🗂️ **Kanban + List Views** — Silky drag-and-drop across **Procrastinating (`To Do`)**, **Actually Cooking (`In Progress`)**, and **Certified Done (`Done`)** with priority glow pills (`Low` / `Medium` / `High`) and double-click inline editing.
 - 🌌 **Maximum Aura UI** — Multi-layer drifting aurora mesh, cursor-reactive spotlight cards, remote-drag glow rings, neon update flashes, and Dark/Light mode.
 - 📡 **Live Telemetry & Presence** — Real-time WebSocket RTT (`ms`) + signal bars, stacked glowing online viewer orbs, live *"Someone is cooking..."* typing indicator, and a live activity ticker + stream drawer.
-- 🤖 **Built-in MCP Server (`/mcp`)** — Plug in any Streamable HTTP MCP client and watch cards appear, move, and vanish live in every browser tab.
+- 🤖 **Built-in MCP Server (`/mcp`)** — Plug in any Streamable HTTP MCP client and watch cards appear, move, bet, and settle live in every browser tab.
+- 🎰 **Card Completion Prediction Gambling** — Every player starts with `1,000 🪙` Aura Coins to bet on when any open card will finish (`⚡ < 5 min`, `🔥 5m – 1h`, `🐢 1h – 24h`, `💀 24h+ / Nuked`), with live parimutuel odds, auto-settlement on completion/deletion, bailouts, and a global leaderboard (and MCP `place_bet` / `get_leaderboard` tools!).
 - 🔐 **API Key Gatekeeper** — Optional `API_KEY` protection (`writes` or `all` mode) with an in-app API Key modal, live verification, and automatic `Authorization: Bearer` injection into REST, WebSocket, and MCP snippets.
 - 🛡️ **Zero-Exposed-Port VPS Deployment** — Runs inside Docker on a VPS with a permanent Cloudflare Tunnel sidecar (`cloudflared`) so your origin IP stays invisible.
 
