@@ -12,12 +12,13 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
 
-  # Named Cloudflare Tunnel (set CLOUDFLARE_TUNNEL_TOKEN in .env, route to http://server:3000)
+  # Named Cloudflare Tunnel (set CLOUDFLARE_TUNNEL_TOKEN in .env; shares server netns so http://127.0.0.1:3000 works)
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     depends_on:
       - server
+    network_mode: "service:server"
     command: ["tunnel", "--no-autoupdate", "run"]
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
