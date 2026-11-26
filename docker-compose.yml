@@ -1,0 +1,35 @@
+services:
+  server:
+    build: ./server
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      DB_PATH: /data/todos.db
+      MAX_TODOS: ${MAX_TODOS:-500}
+      WRITE_LIMIT_PER_MIN: ${WRITE_LIMIT_PER_MIN:-60}
+    volumes:
+      - todo-data:/data
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  # Named Cloudflare Tunnel (set CLOUDFLARE_TUNNEL_TOKEN in .env, route to http://server:3000)
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      - server
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+
+  # Zero-config quick tunnel (no token needed): docker compose --profile quick up -d server cloudflared-quick
+  cloudflared-quick:
+    image: cloudflare/cloudflared:latest
+    profiles: ["quick"]
+    restart: unless-stopped
+    depends_on:
+      - server
+    command: ["tunnel", "--no-autoupdate", "--url", "http://server:3000"]
+
+volumes:
+  todo-data:

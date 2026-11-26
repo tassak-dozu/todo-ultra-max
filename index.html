@@ -307,13 +307,19 @@
   </main>
 
   <script>
-    const API_BASE = "https://todo-ultra-max-api.mantikafasi.workers.dev";
-    const POLL_MS = 3000;
+    const DEFAULT_API_BASE = "https://todo-ultra-max-api.mantikafasi.workers.dev";
+    const apiParam = new URLSearchParams(location.search).get("api");
+    const API_BASE = (apiParam || DEFAULT_API_BASE).replace(/\/+$/, "");
+    const FALLBACK_POLL_MS = 10000;
 
     let todos = [];
     let filter = "all";
     let loading = true;
     let pendingMutations = 0;
+    let ws = null;
+    let wsConnected = false;
+    let wsRetries = 0;
+    let pollTimer = null;
 
     const form = document.getElementById("todo-form");
     const input = document.getElementById("todo-input");
@@ -342,10 +348,11 @@
     }
 
     async function api(path, options = {}) {
-      const res = await fetch(`${API_BASE}${path}`, {
-        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-        ...options,
-      });
+      const headers = { ...(options.headers || {}) };
+      if (options.body && !headers["Content-Type"]) {
+        headers["Content-Type"] = "application/json";
+      }
+      const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error || `Request failed (${res.status})`);
@@ -410,13 +417,74 @@
       }
     }
 
+    function startFallbackPolling() {
+      if (pollTimer) return;
+      pollTimer = setInterval(() => {
+        if (!document.hidden && !wsConnected) fetchTodos();
+      }, FALLBACK_POLL_MS);
+    }
+
+    function stopFallbackPolling() {
+      if (!pollTimer) return;
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+
+    function connectWebSocket() {
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+      const wsUrl = API_BASE.replace(/^http/, "ws") + "/ws";
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch {
+        startFallbackPolling();
+        return;
+      }
+
+      ws.addEventListener("open", () => {
+        wsConnected = true;
+        wsRetries = 0;
+        stopFallbackPolling();
+        setStatus("online", "Shared · Live");
+        showError("");
+      });
+
+      ws.addEventListener("message", (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === "sync" && Array.isArray(msg.todos) && pendingMutations === 0) {
+            todos = msg.todos;
+            loading = false;
+            render();
+          }
+        } catch {}
+      });
+
+      ws.addEventListener("close", () => {
+        const wasConnected = wsConnected;
+        wsConnected = false;
+        ws = null;
+        startFallbackPolling();
+        if (wasConnected && wsRetries < 8) {
+          const delay = Math.min(1000 * 2 ** wsRetries, 30000);
+          wsRetries++;
+          setTimeout(connectWebSocket, delay);
+        }
+      });
+
+      ws.addEventListener("error", () => {
+        ws?.close();
+      });
+    }
+
     async function fetchTodos() {
       if (pendingMutations > 0) return;
       try {
         const data = await api("/api/todos");
         todos = Array.isArray(data.todos) ? data.todos : [];
         loading = false;
-        setStatus("online", "Shared · Live");
+        setStatus("online", wsConnected ? "Shared · Live" : "Shared");
         showError("");
         render();
       } catch (err) {
@@ -437,8 +505,10 @@
           method: "POST",
           body: JSON.stringify({ text: trimmed }),
         });
-        todos.unshift(todo);
-        setStatus("online", "Shared · Live");
+        if (!todos.some((t) => t.id === todo.id)) {
+          todos.unshift(todo);
+        }
+        setStatus("online", wsConnected ? "Shared · Live" : "Shared");
         showError("");
         render();
       } catch (err) {
@@ -459,7 +529,7 @@
           method: "PATCH",
           body: JSON.stringify({ done }),
         });
-        setStatus("online", "Shared · Live");
+        setStatus("online", wsConnected ? "Shared · Live" : "Shared");
         showError("");
       } catch (err) {
         todos = prev;
@@ -477,7 +547,7 @@
       pendingMutations++;
       try {
         await api(`/api/todos/${encodeURIComponent(id)}`, { method: "DELETE" });
-        setStatus("online", "Shared · Live");
+        setStatus("online", wsConnected ? "Shared · Live" : "Shared");
         showError("");
       } catch (err) {
         todos = prev;
@@ -495,7 +565,7 @@
       pendingMutations++;
       try {
         await api("/api/todos?completed=true", { method: "DELETE" });
-        setStatus("online", "Shared · Live");
+        setStatus("online", wsConnected ? "Shared · Live" : "Shared");
         showError("");
       } catch (err) {
         todos = prev;
@@ -526,15 +596,14 @@
     clearBtn.addEventListener("click", clearCompleted);
 
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) fetchTodos();
+      if (!document.hidden) {
+        if (!wsConnected) fetchTodos();
+      }
     });
-
-    setInterval(() => {
-      if (!document.hidden) fetchTodos();
-    }, POLL_MS);
 
     render();
     fetchTodos();
+    connectWebSocket();
   </script>
 </body>
 </html>
