@@ -1,51 +1,37 @@
-# Todo
+# Shared Kanban & Todo Board
 
-A shared HTML todo app with a Dockerized TypeScript backend (SQLite + live WebSockets + MCP server), exposed via Cloudflare Tunnel.
+A real-time shared Kanban & todo board with a Dockerized TypeScript backend (SQLite + live WebSockets + Streamable HTTP MCP server), exposed through Cloudflare Tunnel.
+
+## Features
+- **Kanban & List views** with drag-and-drop columns (`To Do`, `In Progress`, `Done`), priorities (`low`, `medium`, `high`), and inline editing
+- **Instant WebSocket sync** (`/ws`) with live online viewer count
+- **Streamable HTTP MCP server** (`/mcp`) so AI agents can read, add, move, toggle, delete, and clear cards live
 
 ## Endpoints
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /api/health` | Health check |
-| `GET /api/todos` | List all shared tasks |
-| `POST /api/todos` | Add task (`{ "text": "..." }`) |
-| `PATCH /api/todos/:id` | Toggle/edit task (`{ "done": true }`) |
-| `DELETE /api/todos/:id` | Delete a task |
-| `DELETE /api/todos?completed=true` | Clear completed tasks |
-| `GET /ws` | Live WebSocket sync (`{ "type": "sync", "todos": [...] }`) |
-| `POST /mcp` | Streamable HTTP MCP server (`list_todos`, `add_todo`, `toggle_todo`, `delete_todo`, `clear_completed`) |
+| `GET /api/health` | Health check + online count |
+| `GET /api/todos` | List all shared cards |
+| `POST /api/todos` | Add card (`{ "text", "status"?, "priority"? }`) |
+| `PATCH /api/todos/:id` | Move/edit card (`{ "status"?, "priority"?, "text"?, "done"? }`) |
+| `DELETE /api/todos/:id` | Delete a card |
+| `DELETE /api/todos?completed=true` | Clear all Done cards |
+| `GET /ws` | Live WebSocket sync (`{ "type": "sync", "todos", "online" }`) |
+| `POST /mcp` | MCP Streamable HTTP (`list_todos`, `add_todo`, `move_todo`, `toggle_todo`, `delete_todo`, `clear_completed`) |
 
 ## Deploy on a VPS (Docker + Cloudflare Tunnel)
 
-### Option A: Permanent URL with a Named Cloudflare Tunnel
-1. Create a tunnel in Cloudflare Zero Trust → Networks → Tunnels, point a public hostname to `http://server:3000`, and copy the tunnel token.
-2. On your VPS:
-   ```bash
-   git clone https://github.com/tassak-dozu/todo-ultra-max.git
-   cd todo-ultra-max
-   cp .env.example .env
-   # set CLOUDFLARE_TUNNEL_TOKEN=... in .env
-   docker compose up -d --build
-   ```
-3. Point `DEFAULT_API_BASE` in `index.html` to your tunnel hostname (or test immediately via `?api=https://your-domain.com`).
+### Named Cloudflare Tunnel (permanent URL)
+```bash
+git clone https://github.com/tassak-dozu/todo-ultra-max.git
+cd todo-ultra-max
+cp .env.example .env   # set CLOUDFLARE_TUNNEL_TOKEN=...
+docker compose up -d --build server cloudflared
+```
 
-### Option B: Zero-config Quick Tunnel
+### Quick Cloudflare Tunnel (zero-config HTTPS URL)
 ```bash
 docker compose --profile quick up -d --build server cloudflared-quick
-docker compose logs -f cloudflared-quick
-```
-Copy the printed `https://*.trycloudflare.com` URL.
-
-## MCP Client Configuration
-
-Point any Streamable HTTP MCP client at `<your-api-url>/mcp`:
-
-```json
-{
-  "mcpServers": {
-    "todo": {
-      "url": "https://your-domain.com/mcp"
-    }
-  }
-}
+docker compose --profile quick logs -f cloudflared-quick
 ```
