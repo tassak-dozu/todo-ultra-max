@@ -973,13 +973,177 @@
     /* Floating Live Toast */
     .toast-stack {
       position: fixed;
-      bottom: 20px;
+      bottom: 82px;
       right: 20px;
       z-index: 40;
       display: flex;
       flex-direction: column;
       gap: 8px;
       pointer-events: none;
+    }
+
+    /* Live Support Floating Button & Chat */
+    .support-fab {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 45;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 11px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(139, 92, 246, 0.55);
+      background: linear-gradient(135deg, rgba(24, 20, 46, 0.94), rgba(14, 30, 44, 0.94));
+      backdrop-filter: blur(18px);
+      color: #fff;
+      font-size: 0.84rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45), 0 0 26px rgba(139, 92, 246, 0.42);
+      transition: transform 0.16s ease, box-shadow 0.16s ease;
+    }
+
+    .support-fab:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 34px rgba(34, 211, 238, 0.52);
+    }
+
+    .support-badge {
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #f43f5e, #f472b6);
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 800;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 0 12px rgba(244, 63, 94, 0.65);
+    }
+
+    .support-panel {
+      position: fixed;
+      bottom: 76px;
+      right: 20px;
+      z-index: 46;
+      width: min(360px, calc(100vw - 32px));
+      border-radius: 18px;
+      background: var(--surface-strong);
+      border: 1px solid rgba(139, 92, 246, 0.42);
+      backdrop-filter: blur(22px);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 36px rgba(139, 92, 246, 0.22);
+      overflow: hidden;
+      display: none;
+      flex-direction: column;
+      animation: toastIn 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .support-panel.open { display: flex; }
+
+    .support-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 13px 15px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(90deg, rgba(139, 92, 246, 0.16), rgba(34, 211, 238, 0.12));
+    }
+
+    .support-agent {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .support-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #8b5cf6, #22d3ee);
+      display: grid;
+      place-items: center;
+      font-size: 0.95rem;
+      box-shadow: 0 0 14px rgba(34, 211, 238, 0.45);
+    }
+
+    .support-name {
+      font-size: 0.84rem;
+      font-weight: 750;
+      line-height: 1.2;
+    }
+
+    .support-sub {
+      font-size: 0.7rem;
+      color: var(--ok);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .support-msgs {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      padding: 13px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    .sup-msg {
+      max-width: 88%;
+      padding: 9px 12px;
+      border-radius: 13px;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .sup-msg.bot {
+      align-self: flex-start;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+    }
+
+    .sup-msg.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .support-form {
+      display: flex;
+      gap: 7px;
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      background: var(--input-bg);
+    }
+
+    .support-form input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 8px 10px;
+      color: var(--text);
+      font-size: 0.82rem;
+      outline: none;
+    }
+
+    .support-form input:focus { border-color: var(--accent); }
+
+    .support-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 12px;
+      border-top: 1px solid var(--border);
+      font-size: 0.7rem;
+      color: var(--dim);
     }
 
     .toast {
@@ -1238,6 +1402,35 @@
 
   <!-- Floating Live Event Toasts -->
   <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+  <!-- Live Support Widget -->
+  <section class="support-panel" id="support-panel" aria-label="Live support chat">
+    <div class="support-head">
+      <div class="support-agent">
+        <div class="support-avatar">🎧</div>
+        <div>
+          <div class="support-name">Agent Kevin (100% Real Human)</div>
+          <div class="support-sub"><span class="pulse-dot" style="background:var(--ok)"></span>Online · IQ 4000</div>
+        </div>
+      </div>
+      <button type="button" class="icon-btn" id="support-close" aria-label="Close support">&times;</button>
+    </div>
+    <div class="support-msgs" id="support-msgs"></div>
+    <form class="support-form" id="support-form">
+      <input type="text" id="support-input" placeholder="Describe your crisis..." autocomplete="off" />
+      <button type="submit" class="add-btn" style="padding:7px 12px;font-size:0.78rem">Ask</button>
+    </form>
+    <div class="support-foot">
+      <span>⭐ 5.0/5 (mandatory)</span>
+      <button type="button" class="icon-btn" id="support-more" style="font-size:0.72rem">🎲 More Wisdom</button>
+    </div>
+  </section>
+
+  <button type="button" class="support-fab" id="support-fab" aria-label="Open live support">
+    <span class="pulse-dot" style="background:var(--ok);box-shadow:0 0 10px var(--ok)"></span>
+    <span>💬 Live Support</span>
+    <span class="support-badge" id="support-badge">1</span>
+  </button>
 
   <!-- API Key Modal -->
   <div class="modal-backdrop" id="key-modal" role="dialog" aria-modal="true" aria-labelledby="key-title">
@@ -2219,7 +2412,120 @@
       if (e.key === "Escape") {
         mcpModal.classList.remove("open");
         keyModal.classList.remove("open");
+        supportPanel.classList.remove("open");
       }
+    });
+
+    // Live Support Garbage-English Engine
+    const supportFab = document.getElementById("support-fab");
+    const supportPanel = document.getElementById("support-panel");
+    const supportClose = document.getElementById("support-close");
+    const supportMsgs = document.getElementById("support-msgs");
+    const supportForm = document.getElementById("support-form");
+    const supportInput = document.getElementById("support-input");
+    const supportMore = document.getElementById("support-more");
+    const supportBadge = document.getElementById("support-badge");
+
+    const GARBAGE_OPENERS = [
+      "Helo dear sir kindly",
+      "Greetings valued potato,",
+      "Plz immediately",
+      "Urgent advisement:",
+      "Yes hello thank you please",
+      "According to my certified toaster,",
+      "Big apology for the wobbliness,",
+      "Sir madam kindly do the needful and",
+      "Our cloud hamsters confirm you must",
+      "Per my previous hallucination,",
+    ];
+    const GARBAGE_VERBS = [
+      "flurbnicate", "re-bamboozle", "un-sandwich", "turbo-gargle", "synergize",
+      "defenestrate", "microwave", "unplug-and-marinate", "spaghettify", "discombobulate",
+      "butter-encrypt", "yeet-compile", "blorpfy", "re-hydrate", "wiggle-reboot",
+      "download-more", "scrum-massage", "reverse-pickle", "quantum-slap", "over-moisturize",
+    ];
+    const GARBAGE_ADJS = [
+      "crispy", "unleaded", "boneless", "gluten-free", "bluetooth",
+      "sideways", "soggy", "hyper-caffeinated", "non-euclidean", "certified",
+      "fermented", "turbocharged", "lukewarm", "recursive", "questionable",
+      "industrial-grade", "invisible", "lightly-salted", "expired", "premium",
+    ];
+    const GARBAGE_NOUNS = [
+      "ethernet cabbage", "RAM lasagna", "SQLite pickle", "cloud spatula", "TCP banana",
+      "JSON goblin", "wifi mayonnaise", "DNS waffle", "docker hamster", "cache burrito",
+      "kernel noodle", "blockchain spoon", "pixel soup", "firewall avocado", "cookie trombone",
+      "bandwidth turnip", "websocket pigeon", "regex toaster", "API doorknob", "byte-sized ostrich",
+    ];
+    const GARBAGE_ENDERS = [
+      "before the moon expires.",
+      "and revert back the same immediately.",
+      "with 400% enterprise synergy!!",
+      "or your keyboard becomes soup.",
+      "thank you for doing the needful.",
+      "ticket #999999 closed successfully.",
+      "please rate 5 stars or I get unplugged.",
+      "no further questions at this potato.",
+      "our senior wizard is currently napping.",
+      "have you tried yelling at the router?",
+    ];
+
+    function pick(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function generateGarbageEnglish() {
+      const words = [
+        pick(GARBAGE_OPENERS),
+        pick(GARBAGE_VERBS),
+        "the",
+        pick(GARBAGE_ADJS),
+        pick(GARBAGE_NOUNS),
+        "into a",
+        pick(GARBAGE_ADJS),
+        pick(GARBAGE_NOUNS),
+        pick(GARBAGE_ENDERS),
+      ];
+      return words.join(" ");
+    }
+
+    function appendSupportMsg(text, who = "bot") {
+      const div = document.createElement("div");
+      div.className = `sup-msg ${who}`;
+      div.textContent = text;
+      supportMsgs.appendChild(div);
+      supportMsgs.scrollTop = supportMsgs.scrollHeight;
+      return div;
+    }
+
+    function spitGarbageReply() {
+      const typingEl = appendSupportMsg("Agent Kevin is aggressively typing...", "bot");
+      setTimeout(() => {
+        typingEl.textContent = generateGarbageEnglish();
+        supportMsgs.scrollTop = supportMsgs.scrollHeight;
+      }, 320);
+    }
+
+    supportFab.addEventListener("click", () => {
+      const opening = !supportPanel.classList.contains("open");
+      supportPanel.classList.toggle("open");
+      supportBadge.style.display = "none";
+      if (opening) {
+        spitGarbageReply();
+        setTimeout(() => supportInput.focus(), 80);
+      }
+    });
+
+    supportClose.addEventListener("click", () => supportPanel.classList.remove("open"));
+    supportMore.addEventListener("click", spitGarbageReply);
+
+    supportForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const q = supportInput.value.trim();
+      if (q) {
+        appendSupportMsg(q, "user");
+        supportInput.value = "";
+      }
+      spitGarbageReply();
     });
 
     document.addEventListener("visibilitychange", () => {
