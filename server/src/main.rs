@@ -74,7 +74,6 @@ struct PeerState {
 
 #[derive(Debug, Clone)]
 struct DuelOffer {
-    id: String,
     from_peer: String,
     to_peer: String,
     wager: i64,
@@ -1851,7 +1850,6 @@ async fn handle_socket(
                             st_recv.duels.lock().unwrap().insert(
                                 duel_id.clone(),
                                 DuelOffer {
-                                    id: duel_id.clone(),
                                     from_peer: pid_recv.clone(),
                                     to_peer: target_peer.to_string(),
                                     wager,
