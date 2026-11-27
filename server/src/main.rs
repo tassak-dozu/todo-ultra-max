@@ -1175,6 +1175,7 @@ async fn handle_socket(socket: WebSocket, st: Arc<AppState>, is_admin: bool) {
 
     let st_recv = Arc::clone(&st);
     let pid_recv = peer_id.clone();
+    let color_recv = color.clone();
     let mut recv_task = tokio::spawn(async move {
         while let Some(Ok(msg)) = receiver.next().await {
             if let Message::Text(text) = msg {
@@ -1188,6 +1189,35 @@ async fn handle_socket(socket: WebSocket, st: Arc<AppState>, is_admin: bool) {
                         Some("ping") => {
                             let t = val.get("t").and_then(|v| v.as_i64()).unwrap_or_else(now_ms);
                             let _ = direct_tx.send(json!({ "type": "pong", "t": t }).to_string());
+                        }
+                        Some("cursor") => {
+                            let x = val.get("x").and_then(|v| v.as_f64());
+                            let y = val.get("y").and_then(|v| v.as_f64());
+                            if let (Some(x), Some(y)) = (x, y) {
+                                if x.is_finite()
+                                    && y.is_finite()
+                                    && (-4000.0..=4000.0).contains(&x)
+                                    && (-2000.0..=30000.0).contains(&y)
+                                {
+                                    let down = val.get("down").and_then(|v| v.as_bool()).unwrap_or(false);
+                                    let name: Option<String> = val
+                                        .get("name")
+                                        .and_then(|v| v.as_str())
+                                        .map(|n| n.trim().chars().take(24).collect())
+                                        .filter(|n: &String| !n.is_empty());
+                                    let payload = json!({
+                                        "type": "cursor",
+                                        "peerId": pid_recv,
+                                        "color": color_recv,
+                                        "isAdmin": is_admin,
+                                        "name": name,
+                                        "x": x,
+                                        "y": y,
+                                        "down": down
+                                    });
+                                    let _ = st_recv.tx.send(payload.to_string());
+                                }
+                            }
                         }
                         Some("typing") => {
                             let active = val.get("active").and_then(|v| v.as_bool()).unwrap_or(false);
@@ -1272,7 +1302,7 @@ async fn main() {
     let turnstile_enabled = !turnstile_secret_key.trim().is_empty();
 
     let db = TodoDB::open(&db_path, max_todos).expect("Failed to open SQLite DB");
-    let (tx, _) = broadcast::channel::<String>(256);
+    let (tx, _) = broadcast::channel::<String>(1024);
 
     let state = Arc::new(AppState {
         db,

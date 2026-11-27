@@ -3022,7 +3022,55 @@
     .modal-backdrop.silent-probe .modal::after {
       display: none;
     }
-  </style>
+
+    /* Live Multiplayer Cursor Drawing Canvas & Pointer Overlays */
+    #cursor-draw-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 38;
+    }
+
+    #remote-cursors-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 39;
+      overflow: hidden;
+    }
+
+    .remote-cursor {
+      position: fixed;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      will-change: transform;
+      display: flex;
+      align-items: flex-start;
+      gap: 4px;
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+      transition: opacity 0.2s ease;
+    }
+
+    .remote-cursor svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .remote-cursor-tag {
+      margin-top: 12px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.66rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      color: #090b10;
+      white-space: nowrap;
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 4px 12px rgba(0, 0, 0, 0.35);
     }
   </style>
 </head>
@@ -3185,10 +3233,13 @@
         <span class="stat-chip"><span class="stat-dot done"></span>Certified Done <strong id="stat-done">0</strong></span>
         <span class="stat-chip"><span class="stat-dot mcp"></span>Robot Moves <strong class="mono" id="stat-mcp">0</strong></span>
       </div>
-      <button type="button" class="ticker-btn" id="activity-toggle" title="Open the live gossip feed">
-        <span class="src-tag web" id="ticker-tag">LIVE</span>
-        <span id="ticker-text">Eavesdropping on the live stream...</span>
-      </button>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <button type="button" class="ticker-btn" id="clear-ink-btn" title="Wipe cursor drawings">🎨 Clear Ink</button>
+        <button type="button" class="ticker-btn" id="activity-toggle" title="Open the live gossip feed">
+          <span class="src-tag web" id="ticker-tag">LIVE</span>
+          <span id="ticker-text">Eavesdropping on the live stream...</span>
+        </button>
+      </div>
     </div>
 
     <!-- Expandable Live Activity Drawer -->
@@ -3460,6 +3511,8 @@
     </div>
   </div>
 
+  <canvas id="cursor-draw-canvas" aria-hidden="true"></canvas>
+  <div id="remote-cursors-layer" aria-hidden="true"></div>
   <script>
     const DEFAULT_API_BASE = "https://todo-ultra-max.mantikafasi.dev";
     const apiParam = new URLSearchParams(location.search).get("api");
@@ -3500,6 +3553,7 @@
     let activity = [];
     let peers = [];
     let myPeerId = null;
+    let myPeerColor = "#22d3ee";
     let draggingIds = new Set();
     let typingCount = 0;
     let mcpCalls = 0;
@@ -3850,6 +3904,10 @@
         const cid = c.dataset.id;
         c.classList.toggle("remote-drag", Boolean(cid && cid !== draggedId && draggingIds.has(cid)));
       });
+
+      if (window.pruneRemoteCursors && Array.isArray(peers)) {
+        window.pruneRemoteCursors(new Set(peers.map((p) => p.id)));
+      }
     }
 
     function renderActivity() {
@@ -4356,6 +4414,11 @@
           }
           if (msg.type === "welcome") {
             myPeerId = msg.peerId;
+            if (msg.color) myPeerColor = msg.color;
+            return;
+          }
+          if (msg.type === "cursor") {
+            if (window.handleRemoteCursor) window.handleRemoteCursor(msg);
             return;
           }
           if (typeof msg.online === "number") onlineCount = msg.online;
@@ -5415,6 +5478,307 @@
           burstAtEl(watermarkBtn, 28);
           showToast("🤖 Pure Artisanal AI Aura Boosted (+9,000% gradients)", "web");
         });
+      }
+    })();
+
+    // =========================================================================
+    // Collaborative Live Multiplayer Cursors & Neon Ink Drawing Canvas
+    // =========================================================================
+    (function initCollaborativeCursorDraw() {
+      const drawCanvas = document.getElementById("cursor-draw-canvas");
+      const cursorsLayer = document.getElementById("remote-cursors-layer");
+      const clearInkBtn = document.getElementById("clear-ink-btn");
+      if (!drawCanvas || !cursorsLayer) return;
+
+      const ctx = drawCanvas.getContext("2d");
+      let dpr = Math.min(window.devicePixelRatio || 1, 2);
+      let vw = Math.max(1, window.innerWidth);
+      let vh = Math.max(1, window.innerHeight);
+
+      function resizeCanvas() {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        vw = Math.max(1, window.innerWidth);
+        vh = Math.max(1, window.innerHeight);
+        drawCanvas.width = Math.floor(vw * dpr);
+        drawCanvas.height = Math.floor(vh * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      resizeCanvas();
+      window.addEventListener("resize", resizeCanvas, { passive: true });
+
+      const strokes = [];
+      const MAX_STROKES = 1400;
+      const remoteCursors = new Map();
+      let animRunning = false;
+      let selfPrev = null;
+      let selfLastSentAt = 0;
+
+      function ensureAnimLoop() {
+        if (!animRunning && !document.hidden) {
+          animRunning = true;
+          requestAnimationFrame(tick);
+        }
+      }
+
+      function addStrokeSegment(x1, y1, x2, y2, color, down) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < 1 || distSq > 450 * 450) return;
+        strokes.push({
+          x1,
+          y1,
+          x2,
+          y2,
+          color: color || "#22d3ee",
+          width: down ? 5.5 : 2.8,
+          life: down ? 10500 : 4200,
+          born: performance.now(),
+        });
+        if (strokes.length > MAX_STROKES) {
+          strokes.splice(0, strokes.length - MAX_STROKES);
+        }
+        ensureAnimLoop();
+      }
+
+      function toBoardCoords(clientX, clientY) {
+        return {
+          cx: clientX - vw * 0.5,
+          cy: clientY + (window.scrollY || 0),
+        };
+      }
+
+      function createRemoteCursorNode(msg) {
+        const el = document.createElement("div");
+        el.className = "remote-cursor";
+        const color = msg.isAdmin ? "#fbbf24" : (msg.color || "#22d3ee");
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", "M4 3 L19 11 L12 13.5 L9.5 20.5 Z");
+        path.setAttribute("fill", color);
+        path.setAttribute("stroke", "#ffffff");
+        path.setAttribute("stroke-width", "1.6");
+        path.setAttribute("stroke-linejoin", "round");
+        svg.appendChild(path);
+
+        const tag = document.createElement("span");
+        tag.className = "remote-cursor-tag";
+        tag.style.background = color;
+        tag.textContent = msg.isAdmin ? `👑 ${msg.name || "ADMIN"}` : (msg.name || `User#${String(msg.peerId).slice(0, 4)}`);
+
+        el.append(svg, tag);
+        cursorsLayer.appendChild(el);
+        return { el, path, tag, color };
+      }
+
+      window.handleRemoteCursor = (msg) => {
+        if (!msg || !msg.peerId || msg.peerId === myPeerId) return;
+        const x = Number(msg.x);
+        const y = Number(msg.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+
+        let peer = remoteCursors.get(msg.peerId);
+        const color = msg.isAdmin ? "#fbbf24" : (msg.color || "#22d3ee");
+        if (!peer) {
+          const dom = createRemoteCursorNode(msg);
+          peer = {
+            id: msg.peerId,
+            x,
+            y,
+            tx: x,
+            ty: y,
+            lastDrawX: x,
+            lastDrawY: y,
+            color,
+            down: Boolean(msg.down),
+            lastSeen: performance.now(),
+            ...dom,
+          };
+          remoteCursors.set(msg.peerId, peer);
+        } else {
+          if (peer.color !== color) {
+            peer.color = color;
+            peer.path.setAttribute("fill", color);
+            peer.tag.style.background = color;
+          }
+          const nextLabel = msg.isAdmin ? `👑 ${msg.name || "ADMIN"}` : (msg.name || `User#${String(msg.peerId).slice(0, 4)}`);
+          if (peer.tag.textContent !== nextLabel) peer.tag.textContent = nextLabel;
+          addStrokeSegment(peer.lastDrawX, peer.lastDrawY, x, y, color, Boolean(msg.down));
+          peer.lastDrawX = x;
+          peer.lastDrawY = y;
+          peer.tx = x;
+          peer.ty = y;
+          peer.down = Boolean(msg.down);
+          peer.lastSeen = performance.now();
+          peer.el.style.opacity = "1";
+        }
+        ensureAnimLoop();
+      };
+
+      window.pruneRemoteCursors = (activeIds) => {
+        for (const [id, peer] of remoteCursors.entries()) {
+          if (!activeIds.has(id)) {
+            peer.el.remove();
+            remoteCursors.delete(id);
+          }
+        }
+      };
+
+      function handleLocalMove(clientX, clientY, down) {
+        const { cx, cy } = toBoardCoords(clientX, clientY);
+        const selfColor = isAdmin ? "#fbbf24" : (myPeerColor || "#22d3ee");
+        if (selfPrev) {
+          addStrokeSegment(selfPrev.cx, selfPrev.cy, cx, cy, selfColor, down);
+        }
+        selfPrev = { cx, cy };
+
+        const now = performance.now();
+        if (wsConnected && now - selfLastSentAt >= 28) {
+          selfLastSentAt = now;
+          sendWs({
+            type: "cursor",
+            x: Math.round(cx),
+            y: Math.round(cy),
+            down,
+            name: playerName,
+          });
+        }
+      }
+
+      window.addEventListener("pointermove", (e) => {
+        handleLocalMove(e.clientX, e.clientY, Boolean(e.buttons & 1));
+      }, { passive: true });
+
+      window.addEventListener("pointerdown", (e) => {
+        selfPrev = toBoardCoords(e.clientX, e.clientY);
+        if (wsConnected) {
+          sendWs({
+            type: "cursor",
+            x: Math.round(selfPrev.cx),
+            y: Math.round(selfPrev.cy),
+            down: true,
+            name: playerName,
+          });
+        }
+      }, { passive: true });
+
+      window.addEventListener("pointerup", () => {
+        if (wsConnected && selfPrev) {
+          sendWs({
+            type: "cursor",
+            x: Math.round(selfPrev.cx),
+            y: Math.round(selfPrev.cy),
+            down: false,
+            name: playerName,
+          });
+        }
+      }, { passive: true });
+
+      window.addEventListener("pointerleave", () => {
+        selfPrev = null;
+      });
+
+      window.addEventListener("scroll", () => {
+        if (strokes.length > 0 || remoteCursors.size > 0) ensureAnimLoop();
+      }, { passive: true });
+
+      if (clearInkBtn) {
+        clearInkBtn.addEventListener("click", () => {
+          strokes.length = 0;
+          ctx.clearRect(0, 0, vw, vh);
+          burstAtEl(clearInkBtn, 14);
+        });
+      }
+
+      function tick(now) {
+        if (document.hidden) {
+          animRunning = false;
+          return;
+        }
+
+        ctx.clearRect(0, 0, vw, vh);
+        const scrollY = window.scrollY || 0;
+        const halfW = vw * 0.5;
+
+        // Draw & expire all active peer + local cursor strokes
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        for (let i = strokes.length - 1; i >= 0; i--) {
+          const s = strokes[i];
+          const age = now - s.born;
+          if (age >= s.life) {
+            strokes.splice(i, 1);
+            continue;
+          }
+          const alpha = Math.pow(1 - age / s.life, 1.4);
+          const sx1 = halfW + s.x1;
+          const sy1 = s.y1 - scrollY;
+          const sx2 = halfW + s.x2;
+          const sy2 = s.y2 - scrollY;
+
+          // Skip off-screen segments cleanly
+          if ((sy1 < -60 && sy2 < -60) || (sy1 > vh + 60 && sy2 > vh + 60)) continue;
+
+          // Outer neon glow
+          ctx.globalAlpha = alpha * 0.48;
+          ctx.strokeStyle = s.color;
+          ctx.lineWidth = s.width * 2.4;
+          ctx.beginPath();
+          ctx.moveTo(sx1, sy1);
+          ctx.lineTo(sx2, sy2);
+          ctx.stroke();
+
+          // Crisp colored core
+          ctx.globalAlpha = alpha * 0.92;
+          ctx.lineWidth = s.width;
+          ctx.beginPath();
+          ctx.moveTo(sx1, sy1);
+          ctx.lineTo(sx2, sy2);
+          ctx.stroke();
+
+          // Bright white specular filament
+          ctx.globalAlpha = alpha * 0.65;
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = Math.max(0.9, s.width * 0.34);
+          ctx.beginPath();
+          ctx.moveTo(sx1, sy1);
+          ctx.lineTo(sx2, sy2);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+
+        // Smoothly glide remote cursors & expire stale ones
+        let cursorsMoving = false;
+        for (const [id, peer] of remoteCursors.entries()) {
+          if (now - peer.lastSeen > 15000) {
+            peer.el.remove();
+            remoteCursors.delete(id);
+            continue;
+          }
+          const dx = peer.tx - peer.x;
+          const dy = peer.ty - peer.y;
+          if (Math.abs(dx) > 0.2 || Math.abs(dy) > 0.2) {
+            peer.x += dx * 0.28;
+            peer.y += dy * 0.28;
+            cursorsMoving = true;
+          } else {
+            peer.x = peer.tx;
+            peer.y = peer.ty;
+          }
+          const screenX = halfW + peer.x;
+          const screenY = peer.y - scrollY;
+          peer.el.style.transform = `translate3d(${screenX.toFixed(1)}px, ${screenY.toFixed(1)}px, 0)`;
+          if (now - peer.lastSeen > 11000) {
+            peer.el.style.opacity = "0.25";
+          }
+        }
+
+        if (strokes.length > 0 || cursorsMoving || remoteCursors.size > 0) {
+          requestAnimationFrame(tick);
+        } else {
+          animRunning = false;
+        }
       }
     })();
 
