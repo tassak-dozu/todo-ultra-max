@@ -2098,18 +2098,18 @@
       background: linear-gradient(165deg, rgba(139, 92, 246, 0.13) 0%, rgba(15, 23, 42, 0.72) 38%, rgba(34, 211, 238, 0.08) 100%), var(--surface);
     }
 
-    .column[data-status="doing"] {
-      background: linear-gradient(165deg, rgba(56, 189, 248, 0.14) 0%, rgba(15, 23, 42, 0.72) 40%, rgba(139, 92, 246, 0.10) 100%), var(--surface);
+    .column[data-status="in_progress"] {
+      background: linear-gradient(165deg, rgba(56, 189, 248, 0.16) 0%, rgba(15, 23, 42, 0.72) 40%, rgba(139, 92, 246, 0.12) 100%), var(--surface);
     }
 
     .column[data-status="done"] {
-      background: linear-gradient(165deg, rgba(16, 185, 129, 0.14) 0%, rgba(15, 23, 42, 0.72) 40%, rgba(34, 211, 238, 0.09) 100%), var(--surface);
+      background: linear-gradient(165deg, rgba(16, 185, 129, 0.16) 0%, rgba(15, 23, 42, 0.72) 40%, rgba(34, 211, 238, 0.11) 100%), var(--surface);
     }
 
     html[data-theme="light"] .column,
-    html[data-theme="light"] .column[data-status="doing"],
+    html[data-theme="light"] .column[data-status="in_progress"],
     html[data-theme="light"] .column[data-status="done"] {
-      background: linear-gradient(165deg, rgba(139, 92, 246, 0.10) 0%, rgba(255, 255, 255, 0.88) 45%, rgba(34, 211, 238, 0.10) 100%);
+      background: linear-gradient(165deg, rgba(139, 92, 246, 0.12) 0%, rgba(255, 255, 255, 0.88) 45%, rgba(34, 211, 238, 0.12) 100%);
     }
 
     .col-header {
@@ -2144,17 +2144,20 @@
     }
 
     .prio-pill[data-p="high"],
-    .prio-pill.high {
+    .prio-pill.high,
+    .prio-pill.prio-high {
       background: linear-gradient(135deg, rgba(244, 63, 94, 0.28), rgba(249, 115, 22, 0.24));
     }
 
     .prio-pill[data-p="med"],
-    .prio-pill.med {
+    .prio-pill.med,
+    .prio-pill.prio-medium {
       background: linear-gradient(135deg, rgba(251, 191, 36, 0.26), rgba(168, 85, 247, 0.22));
     }
 
     .prio-pill[data-p="low"],
-    .prio-pill.low {
+    .prio-pill.low,
+    .prio-pill.prio-low {
       background: linear-gradient(135deg, rgba(34, 211, 238, 0.24), rgba(16, 185, 129, 0.24));
     }
 
@@ -2167,14 +2170,15 @@
       background: linear-gradient(155deg, rgba(139, 92, 246, 0.12) 0%, rgba(255, 255, 255, 0.96) 40%, rgba(34, 211, 238, 0.10) 100%);
     }
 
-    .support-header {
+    .support-head {
       background: linear-gradient(120deg, #7c3aed, #ec4899 52%, #06b6d4);
       background-size: 200% 200%;
       animation: badgeShimmer 6s ease infinite;
     }
 
-    .support-msg.user {
+    .sup-msg.user {
       background: linear-gradient(135deg, #7c3aed, #db2777);
+      color: #ffffff;
     }
 
     .toast {
@@ -2186,6 +2190,301 @@
     .ai-footer {
       background: linear-gradient(120deg, rgba(139, 92, 246, 0.14), rgba(236, 72, 153, 0.08) 50%, rgba(34, 211, 238, 0.14)), var(--surface);
       border-color: rgba(139, 92, 246, 0.28);
+    }
+
+    /* === MAXIMUM "MADE WITH AI" SLOP OVERDRIVE === */
+    @keyframes hueFlow {
+      0% { filter: hue-rotate(0deg); }
+      100% { filter: hue-rotate(360deg); }
+    }
+
+    @keyframes caretBlink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    @keyframes orbitSpin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes shimmerText {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Global mouse-following AI cursor radial spotlight */
+    .ai-cursor-aura {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      background: radial-gradient(520px circle at var(--gx, 50vw) var(--gy, 25vh), rgba(168, 85, 247, 0.16), rgba(34, 211, 238, 0.09) 35%, transparent 70%);
+      transition: background 0.06s linear;
+    }
+
+    html[data-theme="light"] .ai-cursor-aura {
+      background: radial-gradient(520px circle at var(--gx, 50vw) var(--gy, 25vh), rgba(124, 58, 237, 0.10), rgba(6, 182, 212, 0.07) 35%, transparent 70%);
+    }
+
+    /* AI Hero Slop Section */
+    .ai-hero {
+      position: relative;
+      margin-bottom: 18px;
+      padding: 20px 22px 18px;
+      border-radius: 22px;
+      background:
+        radial-gradient(ellipse at 12% 0%, rgba(139, 92, 246, 0.28), transparent 55%),
+        radial-gradient(ellipse at 88% 100%, rgba(34, 211, 238, 0.24), transparent 55%),
+        radial-gradient(ellipse at 52% 45%, rgba(236, 72, 153, 0.14), transparent 62%),
+        var(--surface);
+      border: 1px solid rgba(168, 85, 247, 0.34);
+      backdrop-filter: blur(22px);
+      overflow: hidden;
+      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    }
+
+    html[data-theme="light"] .ai-hero {
+      background:
+        radial-gradient(ellipse at 12% 0%, rgba(139, 92, 246, 0.16), transparent 55%),
+        radial-gradient(ellipse at 88% 100%, rgba(34, 211, 238, 0.16), transparent 55%),
+        rgba(255, 255, 255, 0.86);
+    }
+
+    .ai-hero::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border-radius: 23px;
+      padding: 1.5px;
+      background: conic-gradient(from var(--saas-angle), #8b5cf6, #22d3ee, #ec4899, #10b981, #fbbf24, #8b5cf6);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      animation: spinBorder 6s linear infinite;
+      opacity: 0.72;
+      pointer-events: none;
+    }
+
+    .ai-hero-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .ai-vibe-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #f5f3ff;
+      background: linear-gradient(110deg, #6d28d9, #db2777, #0891b2, #6d28d9);
+      background-size: 300% 100%;
+      animation: shimmerText 5s ease infinite;
+      box-shadow: 0 0 22px rgba(139, 92, 246, 0.45);
+    }
+
+    .ai-sparkle-spin {
+      display: inline-block;
+      animation: orbitSpin 4s linear infinite;
+    }
+
+    .ai-model-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #67e8f9;
+      background: rgba(6, 182, 212, 0.14);
+      border: 1px solid rgba(34, 211, 238, 0.34);
+    }
+
+    html[data-theme="light"] .ai-model-pill { color: #0e7490; }
+
+    .ai-hero-headline {
+      font-size: clamp(1.35rem, 2.7vw, 2.15rem);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1.12;
+      margin-bottom: 8px;
+      background: linear-gradient(115deg, #ffffff 0%, #c4b5fd 26%, #67e8f9 52%, #f472b6 76%, #fde68a 100%);
+      background-size: 240% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmerText 6s ease infinite;
+    }
+
+    html[data-theme="light"] .ai-hero-headline {
+      background: linear-gradient(115deg, #0f172a 0%, #6d28d9 30%, #0891b2 65%, #db2777 100%);
+      background-size: 240% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .ai-hero-sub {
+      font-size: 0.84rem;
+      color: var(--muted);
+      max-width: 780px;
+      margin-bottom: 14px;
+    }
+
+    .ai-copilot-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .ai-magic-btn {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(196, 181, 253, 0.35);
+      background: linear-gradient(135deg, rgba(124, 58, 237, 0.45), rgba(219, 39, 119, 0.34), rgba(6, 182, 212, 0.36));
+      background-size: 200% 200%;
+      color: #ffffff;
+      font-size: 0.78rem;
+      font-weight: 750;
+      cursor: pointer;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(124, 58, 237, 0.28);
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+      animation: shimmerText 5s ease infinite;
+    }
+
+    .ai-magic-btn:hover {
+      transform: translateY(-2px) scale(1.03);
+      box-shadow: 0 12px 30px rgba(139, 92, 246, 0.45), 0 0 20px rgba(34, 211, 238, 0.3);
+    }
+
+    .ai-magic-btn.secondary {
+      background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(139, 92, 246, 0.18));
+      color: var(--text);
+      border-color: rgba(34, 211, 238, 0.32);
+      box-shadow: none;
+    }
+
+    .ai-magic-btn:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    /* Streaming AI CoT Console */
+    .ai-stream-box {
+      display: none;
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(7, 9, 18, 0.88), rgba(30, 17, 54, 0.78));
+      border: 1px solid rgba(168, 85, 247, 0.36);
+      font-size: 0.78rem;
+      animation: modalPop 0.22s ease both;
+    }
+
+    html[data-theme="light"] .ai-stream-box {
+      background: linear-gradient(135deg, rgba(248, 250, 252, 0.94), rgba(237, 233, 254, 0.88));
+    }
+
+    .ai-stream-box.open { display: block; }
+
+    .ai-stream-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 0.7rem;
+      font-weight: 750;
+      color: #c4b5fd;
+    }
+
+    html[data-theme="light"] .ai-stream-head { color: #6d28d9; }
+
+    .ai-thinking-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(139, 92, 246, 0.22);
+      border: 1px solid rgba(139, 92, 246, 0.38);
+    }
+
+    .ai-stream-body {
+      color: var(--text);
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    .ai-caret {
+      display: inline-block;
+      width: 7px;
+      height: 13px;
+      margin-left: 3px;
+      vertical-align: middle;
+      background: linear-gradient(180deg, #22d3ee, #f472b6);
+      animation: caretBlink 0.7s step-end infinite;
+    }
+
+    /* Animated KPI Sparkline SVG */
+    .kpi-spark {
+      width: 100%;
+      height: 22px;
+      margin-top: 8px;
+      display: block;
+      overflow: visible;
+      opacity: 0.88;
+    }
+
+    .kpi-spark path {
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-dasharray: 220;
+      stroke-dashoffset: 0;
+      animation: shimmerText 4s linear infinite;
+    }
+
+    /* Bottom-left "100% Made With AI" Holographic Badge */
+    .ai-built-watermark {
+      position: fixed;
+      left: 18px;
+      bottom: 18px;
+      z-index: 40;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 13px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      color: #fff;
+      background: linear-gradient(120deg, #6d28d9, #db2777, #0891b2, #6d28d9);
+      background-size: 280% 100%;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      box-shadow: 0 10px 30px rgba(109, 40, 217, 0.45);
+      backdrop-filter: blur(12px);
+      animation: shimmerText 4.5s ease infinite, fabLevitate 4.2s ease-in-out infinite;
+      cursor: pointer;
+    }
+
+    .ai-built-watermark:hover {
+      transform: scale(1.06);
     }
   </style>
 </head>
@@ -2201,6 +2500,7 @@
     <div class="aura-blob aura-4"></div>
   </div>
   <div class="grid-bg"></div>
+  <div class="ai-cursor-aura" id="ai-cursor-aura" aria-hidden="true"></div>
 
   <!-- Flashy SaaS Announcement Marquee -->
   <div class="saas-ribbon" aria-hidden="true">
@@ -2256,6 +2556,30 @@
       </div>
     </header>
 
+    <!-- Flashy "100% Made With AI" Hero Banner -->
+    <section class="ai-hero" aria-label="AI Workspace Overview">
+      <div class="ai-hero-top">
+        <span class="ai-vibe-badge"><span class="ai-sparkle-spin">✦</span> 100% VIBE-CODED WITH GENERATIVE AI™</span>
+        <span class="ai-model-pill mono">🧠 MODEL: OMEGA-SLOP-9000-MAX · 128B PARAMS</span>
+      </div>
+      <h1 class="ai-hero-headline">Ship Todos 10,000x Faster With Hyper-Dimensional AI Synergy.</h1>
+      <p class="ai-hero-sub">
+        Autonomous WebGPU-raymarched productivity engineered by neural agents, zero-GC Rust, Cloudflare Turnstile, and unhinged co-worker prediction markets.
+      </p>
+      <div class="ai-copilot-bar">
+        <button type="button" class="ai-magic-btn" id="ai-spawn-btn">✨ AI Generate Synergy Task</button>
+        <button type="button" class="ai-magic-btn secondary" id="ai-roast-btn">🔥 AI Roast My Board</button>
+        <button type="button" class="ai-magic-btn secondary" id="ai-pitch-btn">🚀 Generate $50M Seed Pitch</button>
+      </div>
+      <div class="ai-stream-box" id="ai-stream-box">
+        <div class="ai-stream-head">
+          <span class="ai-thinking-pill" id="ai-stream-status">⚡ Neural Co-Pilot Reasoning...</span>
+          <span class="mono" id="ai-stream-tps">0 tok/s</span>
+        </div>
+        <div class="ai-stream-body"><span id="ai-stream-text"></span><span class="ai-caret"></span></div>
+      </div>
+    </section>
+
     <!-- Flashy SaaS KPI Bento Bar -->
     <section class="kpi-grid" aria-label="Live SaaS metrics">
       <div class="kpi-card">
@@ -2264,6 +2588,7 @@
           <span class="kpi-val mono" id="kpi-total">0</span>
           <span class="kpi-delta" id="kpi-active-badge">0 active</span>
         </div>
+        <svg class="kpi-spark" viewBox="0 0 120 24" preserveAspectRatio="none"><defs><linearGradient id="sg1" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#22d3ee"/></linearGradient></defs><path stroke="url(#sg1)" d="M0,20 Q18,6 35,15 T72,10 T100,4 L120,2"/></svg>
       </div>
       <div class="kpi-card">
         <div class="kpi-top"><span>Pot Staked</span><span class="kpi-icon">🎰</span></div>
@@ -2271,6 +2596,7 @@
           <span class="kpi-val mono" id="kpi-pot">0 🪙</span>
           <span class="kpi-delta" id="kpi-markets">0 markets</span>
         </div>
+        <svg class="kpi-spark" viewBox="0 0 120 24" preserveAspectRatio="none"><defs><linearGradient id="sg2" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#fbbf24"/><stop offset="100%" stop-color="#f472b6"/></linearGradient></defs><path stroke="url(#sg2)" d="M0,18 L24,14 L44,19 L70,7 L95,11 L120,2"/></svg>
       </div>
       <div class="kpi-card">
         <div class="kpi-top"><span>Ship Velocity</span><span class="kpi-icon">🚀</span></div>
@@ -2278,6 +2604,7 @@
           <span class="kpi-val mono" id="kpi-velocity">0%</span>
           <span class="kpi-delta">↑ ∞% YoY</span>
         </div>
+        <svg class="kpi-spark" viewBox="0 0 120 24" preserveAspectRatio="none"><defs><linearGradient id="sg3" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#10b981"/></linearGradient></defs><path stroke="url(#sg3)" d="M0,21 C25,21 38,14 60,12 C84,10 96,3 120,1"/></svg>
       </div>
       <div class="kpi-card">
         <div class="kpi-top"><span>Neural Synergy</span><span class="kpi-icon">🧠</span></div>
@@ -2285,6 +2612,7 @@
           <span class="kpi-val mono" id="kpi-synergy">99.9%</span>
           <span class="kpi-delta">AI + Rust</span>
         </div>
+        <svg class="kpi-spark" viewBox="0 0 120 24" preserveAspectRatio="none"><defs><linearGradient id="sg4" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ec4899"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient></defs><path stroke="url(#sg4)" d="M0,12 Q20,2 40,12 T80,12 T120,6"/></svg>
       </div>
     </section>
 
@@ -2468,6 +2796,11 @@
       <button type="button" class="icon-btn" id="support-more" style="font-size:0.72rem">🎲 More Wisdom</button>
     </div>
   </section>
+
+  <button type="button" class="ai-built-watermark" id="ai-watermark-btn" title="Click for Neural Synergy Boost">
+    <span class="ai-sparkle-spin">✨</span>
+    <span>Made with 100% AI™</span>
+  </button>
 
   <button type="button" class="support-fab" id="support-fab" aria-label="Open live support">
     <span class="pulse-dot" style="background:var(--ok);box-shadow:0 0 10px var(--ok)"></span>
@@ -4393,6 +4726,132 @@
     fetchWallet();
     fetchTodos();
     connectWebSocket();
+
+    // =========================================================================
+    // 100% "Made With AI" Streaming Copilot, Cursor Aura & Buzzword Generator
+    // =========================================================================
+    (function initAiSlopEngine() {
+      const cursorAura = document.getElementById("ai-cursor-aura");
+      if (cursorAura) {
+        window.addEventListener("pointermove", (e) => {
+          cursorAura.style.setProperty("--gx", `${e.clientX}px`);
+          cursorAura.style.setProperty("--gy", `${e.clientY}px`);
+        }, { passive: true });
+      }
+
+      const streamBox = document.getElementById("ai-stream-box");
+      const streamStatus = document.getElementById("ai-stream-status");
+      const streamTps = document.getElementById("ai-stream-tps");
+      const streamText = document.getElementById("ai-stream-text");
+      const spawnBtn = document.getElementById("ai-spawn-btn");
+      const roastBtn = document.getElementById("ai-roast-btn");
+      const pitchBtn = document.getElementById("ai-pitch-btn");
+      const watermarkBtn = document.getElementById("ai-watermark-btn");
+      let streamTimer = null;
+
+      const AI_TASKS = [
+        "Synergize WebGPU RAG embeddings with blockchain toaster latency",
+        "Refactor autonomous LLM microservices into a single 10,000x gradient",
+        "Fine-tune neural hamsters for sub-0ms Kanban synergy orchestration",
+        "Ship B2B AI-native wrapper around our existing AI-native wrapper",
+        "Deploy multi-agent vector embeddings to optimize coffee break ROI",
+        "Add 4 more bento cards and a 360deg conic border for Series B readiness",
+      ];
+
+      function runAiStream(phases, finalText, onDone) {
+        if (!streamBox || !streamText) return;
+        clearInterval(streamTimer);
+        streamBox.classList.add("open");
+        streamText.textContent = "";
+        let phaseIdx = 0;
+        streamStatus.textContent = phases[0] || "⚡ Thinking (Deep Neural Search)...";
+        streamTps.textContent = "reasoning...";
+
+        const phaseIv = setInterval(() => {
+          phaseIdx++;
+          if (phaseIdx < phases.length) {
+            streamStatus.textContent = phases[phaseIdx];
+          }
+        }, 380);
+
+        setTimeout(() => {
+          clearInterval(phaseIv);
+          streamStatus.textContent = "✨ Streaming Neural Tokens (OMEGA-SLOP-9000)...";
+          let pos = 0;
+          const startedAt = performance.now();
+          streamTimer = setInterval(() => {
+            pos = Math.min(finalText.length, pos + 3);
+            streamText.textContent = finalText.slice(0, pos);
+            const elapsedSec = Math.max(0.05, (performance.now() - startedAt) / 1000);
+            const fakeTps = Math.round((pos / 2.2) / elapsedSec * 140);
+            streamTps.textContent = `${fakeTps.toLocaleString()} tok/s`;
+            if (pos >= finalText.length) {
+              clearInterval(streamTimer);
+              streamStatus.textContent = "✅ 100% AI-Verified Insight (Zero Hallucinations*)";
+              if (onDone) onDone();
+            }
+          }, 16);
+        }, phases.length * 380);
+      }
+
+      if (spawnBtn) {
+        spawnBtn.addEventListener("click", () => {
+          const idea = AI_TASKS[Math.floor(Math.random() * AI_TASKS.length)];
+          const prios = ["high", "medium", "high"];
+          const prio = prios[Math.floor(Math.random() * prios.length)];
+          spawnBtn.disabled = true;
+          runAiStream(
+            [
+              "🧠 Booting 128B Mixture-of-Hamsters...",
+              "🔮 Scanning GitHub stars & YC vibes...",
+              "✨ Synthesizing high-leverage SaaS ticket...",
+            ],
+            `[AI ACTION PLAN] Priority: ${prio.toUpperCase()}\n> "${idea}"\n\nProjected impact: +420% enterprise synergy & instant Series A term sheet.`,
+            async () => {
+              await addTodo(idea, "todo", prio);
+              burstAtEl(spawnBtn, 26);
+              spawnBtn.disabled = false;
+            }
+          );
+        });
+      }
+
+      if (roastBtn) {
+        roastBtn.addEventListener("click", () => {
+          const openCount = todos.filter((t) => t.status !== "done").length;
+          const doneCount = todos.filter((t) => t.status === "done").length;
+          const sample = todos[0]?.text ? `"${todos[0].text.slice(0, 48)}"` : "literally an empty board";
+          burstAtEl(roastBtn, 16);
+          runAiStream(
+            [
+              "🔥 Loading Ruthless YC Partner Persona...",
+              "📊 Judging your Kanban velocity...",
+            ],
+            `Brutal AI Audit:\nYou have ${openCount} unshipped tasks and ${doneCount} survived. Starting with ${sample} — bold strategy, needs at least 3 more gradients and 2 neural copilots before launch.`
+          );
+        });
+      }
+
+      if (pitchBtn) {
+        pitchBtn.addEventListener("click", () => {
+          burstAtEl(pitchBtn, 18);
+          runAiStream(
+            [
+              "💎 Polishing Sequoia Slide Deck...",
+              "📈 Extrapolating hockey-stick chart...",
+            ],
+            `"$50M Seed Deck Ready":\nBoard of Destiny is the Cursor-for-Kanban-for-Gambling-in-Rust™, powered by WebGPU raymarched aura physics and Cloudflare Turnstile. TAM: $84 Trillion.`
+          );
+        });
+      }
+
+      if (watermarkBtn) {
+        watermarkBtn.addEventListener("click", () => {
+          burstAtEl(watermarkBtn, 28);
+          showToast("🤖 Pure Artisanal AI Aura Boosted (+9,000% gradients)", "web");
+        });
+      }
+    })();
 
     // =========================================================================
     // GPU-Saturating Cosmic AI Aura Background (WebGPU Primary + WebGL2 Fallback)
