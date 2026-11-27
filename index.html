@@ -5354,7 +5354,7 @@
     })();
 
     // =========================================================================
-    // GPU-Saturating Cosmic AI Aura Background (WebGPU Primary + WebGL2 Fallback)
+    // Cosmic AI Aura Background (WebGPU Primary + WebGL2 Fallback, GPU-Friendly)
     // =========================================================================
     (function initGpuBackground() {
       let canvas = document.getElementById("gpu-bg");
@@ -5369,30 +5369,39 @@
       const pointer = { x: 0, y: 0, tx: 0, ty: 0 };
       let themeVal = document.documentElement.getAttribute("data-theme") === "light" ? 1.0 : 0.0;
       let targetTheme = themeVal;
+      let adminVal = document.documentElement.getAttribute("data-admin") === "true" ? 1.0 : 0.0;
+      let targetAdmin = adminVal;
 
       window.addEventListener("pointermove", (e) => {
         pointer.tx = (e.clientX / Math.max(1, window.innerWidth)) * 2 - 1;
         pointer.ty = (e.clientY / Math.max(1, window.innerHeight)) * 2 - 1;
       }, { passive: true });
 
-      const themeObserver = new MutationObserver(() => {
+      const attrObserver = new MutationObserver(() => {
         targetTheme = document.documentElement.getAttribute("data-theme") === "light" ? 1.0 : 0.0;
+        targetAdmin = document.documentElement.getAttribute("data-admin") === "true" ? 1.0 : 0.0;
       });
-      themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+      attrObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-admin"] });
 
+      // Cap internal backing size so 4K/Retina & high-refresh GPUs stay cool and quiet
       function getTargetSize() {
-        const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-        const w = Math.max(2, Math.floor(window.innerWidth * dpr));
-        const h = Math.max(2, Math.floor(window.innerHeight * dpr));
-        return { w, h };
+        const vw = Math.max(320, window.innerWidth);
+        const vh = Math.max(240, window.innerHeight);
+        const capScale = Math.min(1.0, 1280 / vw);
+        const w = Math.max(2, Math.floor(vw * capScale));
+        const h = Math.max(2, Math.floor(vh * capScale));
+        const rw = Math.max(2, Math.floor(w * 0.62));
+        const rh = Math.max(2, Math.floor(h * 0.62));
+        return { w, h, rw, rh };
       }
 
-      // ---- 1. WebGPU Primary Renderer (Render-Pipeline Raymarch + HDR-Encoded Bloom + Composite) ----
+      // ---- 1. WebGPU Primary Renderer (Half-Res Raymarch + Bloom + Aura Ribbons) ----
       async function startWebGPU() {
         if (!navigator.gpu) return false;
         let adapter;
         try {
-          adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+          adapter = await navigator.gpu.requestAdapter({ powerPreference: "low-power" })
+            || await navigator.gpu.requestAdapter();
         } catch (_) {
           return false;
         }
@@ -5443,7 +5452,7 @@
             mouse: vec2<f32>,
             time: f32,
             theme: f32,
-            pad0: f32,
+            admin: f32,
             pad1: f32,
           };
 
@@ -5496,16 +5505,14 @@
             );
           }
 
+          // 3 smooth octaves instead of 6: silky aurora clouds at 50% the ALU cost
           fn fbm3(p_in: vec3<f32>) -> f32 {
             var p = p_in;
             var v = 0.0;
-            var a = 0.5;
-            for (var i = 0; i < 6; i = i + 1) {
+            var a = 0.55;
+            for (var i = 0; i < 3; i = i + 1) {
               v += a * noise3(p);
-              p = p * 2.04 + vec3<f32>(13.7, -9.2, 5.4);
-              let xz = rot2(0.45) * p.xz;
-              p.x = xz.x;
-              p.z = xz.y;
+              p = p * 2.07 + vec3<f32>(13.7, -9.2, 5.4);
               a *= 0.5;
             }
             return v;
@@ -5518,42 +5525,50 @@
 
           fn mapScene(p_in: vec3<f32>, t: f32) -> vec2<f32> {
             var p = p_in;
-            let r1 = rot2(t * 0.24) * p.xz;
+            let r1 = rot2(t * 0.28) * p.xz;
             p.x = r1.x; p.z = r1.y;
-            let r2 = rot2(t * 0.17) * p.xy;
+            let r2 = rot2(t * 0.21) * p.xy;
             p.x = r2.x; p.y = r2.y;
 
             let rLen = length(p);
-            let sphereShell = rLen - 1.32;
-            let gp = p * (2.6 + 0.35 * sin(t * 0.5));
-            let gyroid = (dot(sin(gp), cos(gp.yzx)) + 0.18 * sin(rLen * 5.0 - t * 2.2)) / 3.2;
-            let coreSdf = max(sphereShell, abs(gyroid) - 0.13);
-            let heartSdf = rLen - (0.48 + 0.07 * sin(t * 3.1 + p.y * 4.0));
+            let sphereShell = rLen - 1.38;
+            let gp = p * (2.5 + 0.35 * sin(t * 0.6));
+            let gyroid = (dot(sin(gp), cos(gp.yzx)) + 0.20 * sin(rLen * 5.0 - t * 2.6)) / 3.2;
+            let coreSdf = max(sphereShell, abs(gyroid) - 0.14);
+            let heartSdf = rLen - (0.52 + 0.09 * sin(t * 3.5 + p.y * 4.5));
 
             var rp1 = p_in;
-            let a1 = rot2(0.55 + t * 0.35) * rp1.yz;
+            let a1 = rot2(0.55 + t * 0.42) * rp1.yz;
             rp1.y = a1.x; rp1.z = a1.y;
-            let b1 = rot2(t * 0.22) * rp1.xz;
+            let b1 = rot2(t * 0.26) * rp1.xz;
             rp1.x = b1.x; rp1.z = b1.y;
-            let ring1 = sdTorus(rp1, vec2<f32>(2.15, 0.032));
+            let ring1 = sdTorus(rp1, vec2<f32>(2.15, 0.042));
 
             var rp2 = p_in;
-            let a2 = rot2(-0.78 - t * 0.28) * rp2.xy;
+            let a2 = rot2(-0.78 - t * 0.34) * rp2.xy;
             rp2.x = a2.x; rp2.y = a2.y;
-            let b2 = rot2(1.1 + t * 0.31) * rp2.yz;
+            let b2 = rot2(1.1 + t * 0.38) * rp2.yz;
             rp2.y = b2.x; rp2.z = b2.y;
-            let ring2 = sdTorus(rp2, vec2<f32>(2.65, 0.024));
+            let ring2 = sdTorus(rp2, vec2<f32>(2.68, 0.032));
+
+            var rp3 = p_in;
+            let a3 = rot2(1.4 - t * 0.48) * rp3.xz;
+            rp3.x = a3.x; rp3.z = a3.y;
+            let b3 = rot2(0.45 + t * 0.29) * rp3.xy;
+            rp3.x = b3.x; rp3.y = b3.y;
+            let ring3 = sdTorus(rp3, vec2<f32>(3.05, 0.022));
 
             var d = coreSdf;
             var mat = 1.0;
             if (heartSdf < d) { d = heartSdf; mat = 2.0; }
             if (ring1 < d) { d = ring1; mat = 3.0; }
             if (ring2 < d) { d = ring2; mat = 4.0; }
+            if (ring3 < d) { d = ring3; mat = 5.0; }
             return vec2<f32>(d, mat);
           }
 
           fn calcNormal(p: vec3<f32>, t: f32) -> vec3<f32> {
-            let e = 0.0025;
+            let e = 0.004;
             let k0 = vec3<f32>( 1.0, -1.0, -1.0);
             let k1 = vec3<f32>(-1.0, -1.0,  1.0);
             let k2 = vec3<f32>(-1.0,  1.0, -1.0);
@@ -5566,11 +5581,11 @@
             );
           }
 
-          fn auraPalette(x: f32) -> vec3<f32> {
-            let cViolet = vec3<f32>(0.545, 0.361, 0.965);
-            let cCyan   = vec3<f32>(0.133, 0.827, 0.933);
-            let cPink   = vec3<f32>(0.957, 0.447, 0.714);
-            let cMint   = vec3<f32>(0.063, 0.725, 0.506);
+          fn auraPalette(x: f32, admin: f32) -> vec3<f32> {
+            let cViolet = mix(vec3<f32>(0.62, 0.38, 1.00), vec3<f32>(1.00, 0.78, 0.16), admin);
+            let cCyan   = mix(vec3<f32>(0.15, 0.90, 0.98), vec3<f32>(0.98, 0.25, 0.42), admin);
+            let cPink   = vec3<f32>(1.00, 0.44, 0.78);
+            let cMint   = mix(vec3<f32>(0.10, 0.92, 0.62), vec3<f32>(1.00, 0.56, 0.18), admin);
             let p = fract(x) * 4.0;
             if (p < 1.0) { return mix(cViolet, cCyan, p); }
             if (p < 2.0) { return mix(cCyan, cMint, p - 1.0); }
@@ -5591,48 +5606,61 @@
               );
 
               let t = u.time;
-              var ro = vec3<f32>(u.mouse.x * 0.65, -u.mouse.y * 0.45, 5.2);
+              var ro = vec3<f32>(u.mouse.x * 0.75, -u.mouse.y * 0.52, 4.65);
               let lookAt = vec3<f32>(0.0, 0.0, 0.0);
               let fwd = normalize(lookAt - ro);
               let right = normalize(cross(fwd, vec3<f32>(0.0, 1.0, 0.0)));
               let up = cross(right, fwd);
-              var rd = normalize(fwd * 1.65 + right * pScreen.x + up * pScreen.y);
+              var rd = normalize(fwd * 1.55 + right * pScreen.x + up * pScreen.y);
 
               let centerDist = length(pScreen);
-              let lens = 0.08 / (centerDist * centerDist + 0.22);
-              rd = normalize(rd - vec3<f32>(pScreen * lens * 0.18, 0.0));
+              let lens = 0.09 / (centerDist * centerDist + 0.24);
+              rd = normalize(rd - vec3<f32>(pScreen * lens * 0.22, 0.0));
 
               var dist = 0.0;
               var hit = false;
               var mat = 0.0;
               var minCoreDist = 10.0;
-              for (var i = 0; i < 112; i = i + 1) {
+              for (var i = 0; i < 56; i = i + 1) {
                 let pos = ro + rd * dist;
                 let res = mapScene(pos, t);
                 minCoreDist = min(minCoreDist, res.x);
-                if (res.x < 0.002) {
+                if (res.x < 0.004) {
                   hit = true;
                   mat = res.y;
                   break;
                 }
-                dist += res.x * 0.82;
-                if (dist > 14.0) { break; }
+                dist += res.x * 0.94;
+                if (dist > 11.5) { break; }
               }
 
-              var col = mix(vec3<f32>(0.002, 0.003, 0.007), vec3<f32>(0.90, 0.93, 0.99), u.theme);
+              // Deep cosmic aurora base instead of dead black
+              let skyGrad = mix(
+                auraPalette(in.uv.x * 0.35 + in.uv.y * 0.25 + t * 0.04, u.admin) * 0.14 + vec3<f32>(0.015, 0.012, 0.045),
+                vec3<f32>(0.90, 0.93, 0.99),
+                u.theme
+              );
+              var col = skyGrad;
 
+              // Sweeping northern-lights aurora curtains across screen
+              let rib1 = exp(-abs(pScreen.y - 0.35 * sin(pScreen.x * 1.8 + t * 0.55) - 0.15 * cos(pScreen.x * 3.1 - t * 0.4)) * 3.8);
+              let rib2 = exp(-abs(pScreen.y + 0.42 * cos(pScreen.x * 1.4 - t * 0.45) + 0.12 * sin(pScreen.x * 2.7 + t * 0.5)) * 4.4);
+              col += auraPalette(pScreen.x * 0.22 + t * 0.08, u.admin) * rib1 * mix(0.55, 0.22, u.theme);
+              col += auraPalette(pScreen.x * 0.22 + 0.55 - t * 0.07, u.admin) * rib2 * mix(0.45, 0.18, u.theme);
+
+              // Volumetric aura nebula (14 silky 3-octave FBM steps)
               var volAccum = vec3<f32>(0.0);
-              var volT = 0.8;
-              let maxVolT = select(8.5, dist, hit);
-              let stepVol = (maxVolT - volT) / 34.0;
-              if (stepVol > 0.01) {
-                for (var j = 0; j < 34; j = j + 1) {
+              var volT = 1.0;
+              let maxVolT = select(7.8, dist, hit);
+              let stepVol = (maxVolT - volT) / 14.0;
+              if (stepVol > 0.02) {
+                for (var j = 0; j < 14; j = j + 1) {
                   let vp = ro + rd * volT;
                   let radial = length(vp);
-                  let swirl = vp * 0.55 + vec3<f32>(t * 0.09, -t * 0.07, t * 0.05);
+                  let swirl = vp * 0.58 + vec3<f32>(t * 0.11, -t * 0.08, t * 0.06);
                   let n = fbm3(swirl);
-                  let density = smoothstep(0.54, 0.90, n) * exp(-radial * 0.42) * 0.075;
-                  let nebCol = auraPalette(n * 1.4 + radial * 0.12 - t * 0.04);
+                  let density = smoothstep(0.42, 0.88, n) * exp(-radial * 0.34) * 0.15;
+                  let nebCol = auraPalette(n * 1.35 + radial * 0.15 - t * 0.06, u.admin);
                   volAccum += nebCol * density;
                   volT += stepVol;
                 }
@@ -5642,32 +5670,45 @@
                 let hp = ro + rd * dist;
                 let n = calcNormal(hp, t);
                 let viewDir = -rd;
-                let fresnel = pow(1.0 - max(dot(n, viewDir), 0.0), 3.2);
-                let rimCol = auraPalette(dot(n, vec3<f32>(0.4, 0.7, 0.2)) * 0.5 + t * 0.08);
+                let fresnel = pow(1.0 - max(dot(n, viewDir), 0.0), 2.8);
+                let rimCol = auraPalette(dot(n, vec3<f32>(0.4, 0.7, 0.2)) * 0.5 + t * 0.11, u.admin);
 
                 if (mat == 1.0) {
                   let refl = reflect(rd, n);
-                  let env = auraPalette(refl.y * 0.5 + refl.x * 0.3 + t * 0.06);
-                  let spec = pow(max(dot(refl, normalize(vec3<f32>(0.6, 0.8, 0.5))), 0.0), 24.0);
-                  col = env * (0.35 + 0.95 * fresnel) + rimCol * fresnel * 1.8 + vec3<f32>(1.0) * spec * 0.9;
+                  let env = auraPalette(refl.y * 0.5 + refl.x * 0.3 + t * 0.08, u.admin);
+                  let spec = pow(max(dot(refl, normalize(vec3<f32>(0.6, 0.8, 0.5))), 0.0), 20.0);
+                  col = env * (0.48 + 1.15 * fresnel) + rimCol * fresnel * 2.2 + vec3<f32>(1.0) * spec * 1.1;
                 } else if (mat == 2.0) {
-                  col = vec3<f32>(1.6, 0.58, 0.16) * (1.2 + fresnel * 2.0);
+                  col = auraPalette(t * 0.18 + hp.y * 0.4, 1.0) * (1.45 + fresnel * 2.3);
                 } else if (mat == 3.0) {
-                  col = vec3<f32>(0.20, 1.35, 1.65) * (0.9 + fresnel * 1.5);
+                  let pulse = 0.75 + 0.45 * sin(atan2(hp.z, hp.x) * 5.0 - t * 4.5);
+                  col = vec3<f32>(0.25, 1.55, 1.95) * pulse * (1.0 + fresnel * 1.8);
+                } else if (mat == 4.0) {
+                  let pulse = 0.75 + 0.45 * sin(atan2(hp.y, hp.x) * 6.0 + t * 3.8);
+                  col = vec3<f32>(1.75, 0.46, 1.45) * pulse * (1.0 + fresnel * 1.8);
                 } else {
-                  col = vec3<f32>(1.45, 0.42, 1.15) * (0.9 + fresnel * 1.5);
+                  col = vec3<f32>(0.35, 1.75, 1.05) * (0.95 + fresnel * 1.7);
                 }
               }
 
-              let halo = exp(-minCoreDist * 5.5) * 0.28;
-              col += auraPalette(t * 0.07 + centerDist * 0.25) * halo;
-              col += volAccum * mix(0.55, 0.55, u.theme);
+              // Intense radiant aura corona & volumetric god-ray bursts
+              let ang = atan2(pScreen.y, pScreen.x);
+              let rays = pow(max(0.0, sin(ang * 7.0 + t * 0.9) * cos(ang * 4.0 - t * 0.6)), 2.0);
+              let corona = exp(-minCoreDist * 3.6) * (0.62 + 0.45 * rays);
+              col += auraPalette(t * 0.09 + centerDist * 0.25 + ang * 0.16, u.admin) * corona;
+              col += volAccum * mix(0.95, 0.68, u.theme);
 
-              let gridWave = sin(pScreen.x * 16.0 + t * 0.4) * sin(pScreen.y * 16.0 - t * 0.3);
-              col += vec3<f32>(0.25, 0.55, 0.95) * max(gridWave - 0.94, 0.0) * 1.2 * (1.0 - u.theme * 0.6);
+              // Twinkling cosmic sparkle dust
+              let starCell = floor(pScreen * 18.0);
+              let starHash = hash31(vec3<f32>(starCell, 1.0));
+              if (starHash > 0.92) {
+                let sf = fract(pScreen * 18.0) - 0.5;
+                let twinkle = 0.5 + 0.5 * sin(t * 4.2 + starHash * 60.0);
+                let star = exp(-dot(sf, sf) * 32.0) * twinkle * 1.8;
+                col += auraPalette(starHash * 3.0 + t * 0.1, u.admin) * star * (1.0 - u.theme * 0.6);
+              }
 
-              // Reinhard-encode HDR into rgba8unorm [0, 1]
-              let encoded = col / (vec3<f32>(1.0) + col * 0.5);
+              let encoded = col / (vec3<f32>(1.0) + col * 0.45);
               return vec4<f32>(clamp(encoded, vec3<f32>(0.0), vec3<f32>(1.0)), 1.0);
             }
           `
@@ -5682,15 +5723,15 @@
 
             @fragment
             fn fs(in: VSOut) -> @location(0) vec4<f32> {
-              let weights = array<f32, 7>(0.19648255, 0.17466632, 0.12098536, 0.06559061, 0.02783468, 0.00924468, 0.00240229);
-              let stepUv = bp.dir * 2.0 / bp.texSize;
+              let weights = array<f32, 5>(0.22702702, 0.19459459, 0.12162162, 0.05405405, 0.01621621);
+              let stepUv = bp.dir * 2.4 / bp.texSize;
               var sum = vec3<f32>(0.0);
 
-              for (var i = -6; i <= 6; i = i + 1) {
+              for (var i = -4; i <= 4; i = i + 1) {
                 var c = textureSample(inTex, samp, clamp(in.uv + stepUv * f32(i), vec2<f32>(0.0), vec2<f32>(1.0))).rgb;
                 if (bp.brightPass == 1) {
                   let luma = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
-                  c = c * smoothstep(0.62, 1.05, luma);
+                  c = c * smoothstep(0.45, 0.95, luma);
                 }
                 sum += c * weights[abs(i)];
               }
@@ -5702,7 +5743,7 @@
 
         const compositeShader = device.createShaderModule({
           code: commonWGSL + /* wgsl */ `
-            struct CompParams { theme: f32, time: f32, pad0: f32, pad1: f32 };
+            struct CompParams { theme: f32, time: f32, admin: f32, pad1: f32 };
             @group(0) @binding(0) var<uniform> cp: CompParams;
             @group(0) @binding(1) var samp: sampler;
             @group(0) @binding(2) var sceneTex: texture_2d<f32>;
@@ -5714,22 +5755,22 @@
             }
 
             fn decodeHDR(c: vec3<f32>) -> vec3<f32> {
-              return c / max(vec3<f32>(1.0) - c * 0.5, vec3<f32>(0.05));
+              return c / max(vec3<f32>(1.0) - c * 0.45, vec3<f32>(0.06));
             }
 
             @fragment
             fn fs(in: VSOut) -> @location(0) vec4<f32> {
-              let offset = (in.uv - 0.5) * 0.0045;
+              let offset = (in.uv - 0.5) * 0.0055;
               let r = textureSample(sceneTex, samp, in.uv + offset).r;
               let g = textureSample(sceneTex, samp, in.uv).g;
               let b = textureSample(sceneTex, samp, in.uv - offset).b;
               let bloom = textureSample(bloomTex, samp, in.uv).rgb;
 
-              var col = decodeHDR(vec3<f32>(r, g, b)) + decodeHDR(bloom) * mix(0.42, 0.22, cp.theme);
+              var col = decodeHDR(vec3<f32>(r, g, b)) + decodeHDR(bloom) * mix(0.68, 0.30, cp.theme);
               col = aces(col);
               col = pow(col, vec3<f32>(1.0 / 2.2));
 
-              let vig = 1.0 - dot(in.uv - 0.5, in.uv - 0.5) * mix(0.75, 0.10, cp.theme);
+              let vig = 1.0 - dot(in.uv - 0.5, in.uv - 0.5) * mix(0.55, 0.08, cp.theme);
               col *= vig;
               return vec4<f32>(col, 1.0);
             }
@@ -5762,20 +5803,20 @@
         const compBuf = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
 
         let bgRaymarch, bgBloomH, bgBloomV, bgComp;
-        let curW = 0, curH = 0;
+        let curW = 0, curH = 0, curRW = 0, curRH = 0;
 
-        function allocateTargets(w, h) {
+        function allocateTargets(w, h, rw, rh) {
           if (sceneTex) sceneTex.destroy();
           if (bloomTexA) bloomTexA.destroy();
           if (bloomTexB) bloomTexB.destroy();
 
           canvas.width = w;
           canvas.height = h;
-          const bw = Math.max(2, Math.floor(w / 2));
-          const bh = Math.max(2, Math.floor(h / 2));
+          const bw = Math.max(2, Math.floor(rw * 0.55));
+          const bh = Math.max(2, Math.floor(rh * 0.55));
 
           sceneTex = device.createTexture({
-            size: [w, h],
+            size: [rw, rh],
             format: "rgba8unorm",
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING
           });
@@ -5791,7 +5832,7 @@
           });
 
           const bhData = new ArrayBuffer(32);
-          new Float32Array(bhData, 0, 4).set([1, 0, w, h]);
+          new Float32Array(bhData, 0, 4).set([1, 0, rw, rh]);
           new Int32Array(bhData, 16, 2).set([1, 0]);
           device.queue.writeBuffer(blurHBuf, 0, bhData);
 
@@ -5829,33 +5870,40 @@
               { binding: 3, resource: bloomTexB.createView() }
             ]
           });
-          curW = w; curH = h;
+          curW = w; curH = h; curRW = rw; curRH = rh;
         }
 
         const sz = getTargetSize();
-        allocateTargets(sz.w, sz.h);
+        allocateTargets(sz.w, sz.h, sz.rw, sz.rh);
         document.body.classList.add("gpu-active");
 
         const paramsData = new Float32Array(8);
         const compData = new Float32Array(4);
         const t0 = performance.now();
+        let lastDraw = 0;
 
         function frame(now) {
           if (dead) return;
-          const next = getTargetSize();
-          if (next.w !== curW || next.h !== curH) allocateTargets(next.w, next.h);
+          rafId = requestAnimationFrame(frame);
+          if (document.hidden || now - lastDraw < 22) return; // Cap ~45fps so GPU stays ice cold
+          lastDraw = now;
 
-          pointer.x += (pointer.tx - pointer.x) * 0.06;
-          pointer.y += (pointer.ty - pointer.y) * 0.06;
-          themeVal += (targetTheme - themeVal) * 0.08;
+          const next = getTargetSize();
+          if (next.w !== curW || next.h !== curH) allocateTargets(next.w, next.h, next.rw, next.rh);
+
+          pointer.x += (pointer.tx - pointer.x) * 0.08;
+          pointer.y += (pointer.ty - pointer.y) * 0.08;
+          themeVal += (targetTheme - themeVal) * 0.1;
+          adminVal += (targetAdmin - adminVal) * 0.1;
           const elapsed = (now - t0) * 0.001;
 
-          paramsData[0] = curW; paramsData[1] = curH;
+          paramsData[0] = curRW; paramsData[1] = curRH;
           paramsData[2] = pointer.x; paramsData[3] = pointer.y;
           paramsData[4] = elapsed; paramsData[5] = themeVal;
+          paramsData[6] = adminVal;
           device.queue.writeBuffer(paramsBuf, 0, paramsData);
 
-          compData[0] = themeVal; compData[1] = elapsed;
+          compData[0] = themeVal; compData[1] = elapsed; compData[2] = adminVal;
           device.queue.writeBuffer(compBuf, 0, compData);
 
           const encoder = device.createCommandEncoder();
@@ -5893,19 +5941,18 @@
           p4.end();
 
           device.queue.submit([encoder.finish()]);
-          rafId = requestAnimationFrame(frame);
         }
 
         rafId = requestAnimationFrame(frame);
         return true;
       }
 
-      // ---- 2. WebGL2 Multi-Pass Fallback ----
+      // ---- 2. WebGL2 Multi-Pass Fallback (Half-Res Raymarch + Bloom, GPU-Friendly) ----
       function startWebGL2() {
         const gl = canvas.getContext("webgl2", {
           alpha: false,
           antialias: false,
-          powerPreference: "high-performance"
+          powerPreference: "low-power"
         });
         if (!gl) return false;
 
@@ -5931,6 +5978,7 @@
           uniform vec2 uMouse;
           uniform float uTime;
           uniform float uTheme;
+          uniform float uAdmin;
           uniform sampler3D uNoise3D;
 
           mat2 rot2(float a) {
@@ -5958,11 +6006,10 @@
           }
 
           float fbm3(vec3 p) {
-            float v = 0.0, a = 0.5;
-            for (int i = 0; i < 6; i++) {
+            float v = 0.0, a = 0.55;
+            for (int i = 0; i < 3; i++) {
               v += a * noise3(p);
-              p = p * 2.04 + vec3(13.7, -9.2, 5.4);
-              p.xz = rot2(0.45) * p.xz;
+              p = p * 2.07 + vec3(13.7, -9.2, 5.4);
               a *= 0.5;
             }
             return v;
@@ -5975,34 +6022,40 @@
 
           vec2 mapScene(vec3 pIn, float t) {
             vec3 p = pIn;
-            p.xz = rot2(t * 0.24) * p.xz;
-            p.xy = rot2(t * 0.17) * p.xy;
+            p.xz = rot2(t * 0.28) * p.xz;
+            p.xy = rot2(t * 0.21) * p.xy;
             float rLen = length(p);
-            float sphereShell = rLen - 1.32;
-            vec3 gp = p * (2.6 + 0.35 * sin(t * 0.5));
-            float gyroid = (dot(sin(gp), cos(gp.yzx)) + 0.18 * sin(rLen * 5.0 - t * 2.2)) / 3.2;
-            float coreSdf = max(sphereShell, abs(gyroid) - 0.13);
-            float heartSdf = rLen - (0.48 + 0.07 * sin(t * 3.1 + p.y * 4.0));
+            float sphereShell = rLen - 1.38;
+            vec3 gp = p * (2.5 + 0.35 * sin(t * 0.6));
+            float gyroid = (dot(sin(gp), cos(gp.yzx)) + 0.20 * sin(rLen * 5.0 - t * 2.6)) / 3.2;
+            float coreSdf = max(sphereShell, abs(gyroid) - 0.14);
+            float heartSdf = rLen - (0.52 + 0.09 * sin(t * 3.5 + p.y * 4.5));
 
             vec3 rp1 = pIn;
-            rp1.yz = rot2(0.55 + t * 0.35) * rp1.yz;
-            rp1.xz = rot2(t * 0.22) * rp1.xz;
-            float ring1 = sdTorus(rp1, vec2(2.15, 0.032));
+            rp1.yz = rot2(0.55 + t * 0.42) * rp1.yz;
+            rp1.xz = rot2(t * 0.26) * rp1.xz;
+            float ring1 = sdTorus(rp1, vec2(2.15, 0.042));
 
             vec3 rp2 = pIn;
-            rp2.xy = rot2(-0.78 - t * 0.28) * rp2.xy;
-            rp2.yz = rot2(1.1 + t * 0.31) * rp2.yz;
-            float ring2 = sdTorus(rp2, vec2(2.65, 0.024));
+            rp2.xy = rot2(-0.78 - t * 0.34) * rp2.xy;
+            rp2.yz = rot2(1.1 + t * 0.38) * rp2.yz;
+            float ring2 = sdTorus(rp2, vec2(2.68, 0.032));
+
+            vec3 rp3 = pIn;
+            rp3.xz = rot2(1.4 - t * 0.48) * rp3.xz;
+            rp3.xy = rot2(0.45 + t * 0.29) * rp3.xy;
+            float ring3 = sdTorus(rp3, vec2(3.05, 0.022));
 
             float d = coreSdf; float mat = 1.0;
             if (heartSdf < d) { d = heartSdf; mat = 2.0; }
             if (ring1 < d) { d = ring1; mat = 3.0; }
             if (ring2 < d) { d = ring2; mat = 4.0; }
+            if (ring3 < d) { d = ring3; mat = 5.0; }
             return vec2(d, mat);
           }
 
           vec3 calcNormal(vec3 p, float t) {
-            float e = 0.0025;
+            float e = 0.004;
             vec3 k0 = vec3( 1,-1,-1), k1 = vec3(-1,-1, 1), k2 = vec3(-1, 1,-1), k3 = vec3( 1, 1, 1);
             return normalize(
               k0 * mapScene(p + k0 * e, t).x +
@@ -6012,11 +6065,11 @@
             );
           }
 
-          vec3 auraPalette(float x) {
-            vec3 cV = vec3(0.545, 0.361, 0.965);
-            vec3 cC = vec3(0.133, 0.827, 0.933);
-            vec3 cP = vec3(0.957, 0.447, 0.714);
-            vec3 cM = vec3(0.063, 0.725, 0.506);
+          vec3 auraPalette(float x, float admin) {
+            vec3 cV = mix(vec3(0.62, 0.38, 1.00), vec3(1.00, 0.78, 0.16), admin);
+            vec3 cC = mix(vec3(0.15, 0.90, 0.98), vec3(0.98, 0.25, 0.42), admin);
+            vec3 cP = vec3(1.00, 0.44, 0.78);
+            vec3 cM = mix(vec3(0.10, 0.92, 0.62), vec3(1.00, 0.56, 0.18), admin);
             float p = fract(x) * 4.0;
             if (p < 1.0) return mix(cV, cC, p);
             if (p < 2.0) return mix(cC, cM, p - 1.0);
@@ -6027,43 +6080,52 @@
           void main() {
             vec2 pScreen = (vUv - 0.5) * vec2(uRes.x / uRes.y, 1.0) * 2.0;
             float t = uTime;
-            vec3 ro = vec3(uMouse.x * 0.65, -uMouse.y * 0.45, 5.2);
+            vec3 ro = vec3(uMouse.x * 0.75, -uMouse.y * 0.52, 4.65);
             vec3 fwd = normalize(-ro);
             vec3 right = normalize(cross(fwd, vec3(0, 1, 0)));
             vec3 up = cross(right, fwd);
-            vec3 rd = normalize(fwd * 1.65 + right * pScreen.x + up * pScreen.y);
+            vec3 rd = normalize(fwd * 1.55 + right * pScreen.x + up * pScreen.y);
 
             float centerDist = length(pScreen);
-            float lens = 0.08 / (centerDist * centerDist + 0.22);
-            rd = normalize(rd - vec3(pScreen * lens * 0.18, 0.0));
+            float lens = 0.09 / (centerDist * centerDist + 0.24);
+            rd = normalize(rd - vec3(pScreen * lens * 0.22, 0.0));
 
             float dist = 0.0;
             bool hit = false;
             float mat = 0.0;
             float minCore = 10.0;
-            for (int i = 0; i < 96; i++) {
+            for (int i = 0; i < 56; i++) {
               vec2 res = mapScene(ro + rd * dist, t);
               minCore = min(minCore, res.x);
-              if (res.x < 0.002) { hit = true; mat = res.y; break; }
-              dist += res.x * 0.85;
-              if (dist > 14.0) break;
+              if (res.x < 0.004) { hit = true; mat = res.y; break; }
+              dist += res.x * 0.94;
+              if (dist > 11.5) break;
             }
 
-            vec3 col = mix(vec3(0.002, 0.003, 0.007), vec3(0.90, 0.93, 0.99), uTheme);
+            vec3 col = mix(
+              auraPalette(vUv.x * 0.35 + vUv.y * 0.25 + t * 0.04, uAdmin) * 0.14 + vec3(0.015, 0.012, 0.045),
+              vec3(0.90, 0.93, 0.99),
+              uTheme
+            );
+
+            float rib1 = exp(-abs(pScreen.y - 0.35 * sin(pScreen.x * 1.8 + t * 0.55) - 0.15 * cos(pScreen.x * 3.1 - t * 0.4)) * 3.8);
+            float rib2 = exp(-abs(pScreen.y + 0.42 * cos(pScreen.x * 1.4 - t * 0.45) + 0.12 * sin(pScreen.x * 2.7 + t * 0.5)) * 4.4);
+            col += auraPalette(pScreen.x * 0.22 + t * 0.08, uAdmin) * rib1 * mix(0.55, 0.22, uTheme);
+            col += auraPalette(pScreen.x * 0.22 + 0.55 - t * 0.07, uAdmin) * rib2 * mix(0.45, 0.18, uTheme);
 
             vec3 volAccum = vec3(0.0);
-            float volT = 0.8;
-            float maxVolT = hit ? dist : 8.5;
-            float stepVol = (maxVolT - volT) / 28.0;
-            if (stepVol > 0.01) {
-              for (int j = 0; j < 28; j++) {
+            float volT = 1.0;
+            float maxVolT = hit ? dist : 7.8;
+            float stepVol = (maxVolT - volT) / 14.0;
+            if (stepVol > 0.02) {
+              for (int j = 0; j < 14; j++) {
                 vec3 vp = ro + rd * volT;
                 float radial = length(vp);
-                float n = fbm3(vp * 0.55 + vec3(t * 0.09, -t * 0.07, t * 0.05));
+                float n = fbm3(vp * 0.58 + vec3(t * 0.11, -t * 0.08, t * 0.06));
                 float fine = texture(uNoise3D, vp * 0.18 + vec3(t * 0.02)).r;
-                n = mix(n, fine, 0.28);
-                float dens = smoothstep(0.54, 0.90, n) * exp(-radial * 0.42) * 0.075;
-                volAccum += auraPalette(n * 1.4 + radial * 0.12 - t * 0.04) * dens;
+                n = mix(n, fine, 0.24);
+                float dens = smoothstep(0.42, 0.88, n) * exp(-radial * 0.34) * 0.15;
+                volAccum += auraPalette(n * 1.35 + radial * 0.15 - t * 0.06, uAdmin) * dens;
                 volT += stepVol;
               }
             }
@@ -6071,24 +6133,39 @@
             if (hit) {
               vec3 hp = ro + rd * dist;
               vec3 n = calcNormal(hp, t);
-              float fres = pow(1.0 - max(dot(n, -rd), 0.0), 3.2);
-              vec3 rimCol = auraPalette(dot(n, vec3(0.4, 0.7, 0.2)) * 0.5 + t * 0.08);
+              float fres = pow(1.0 - max(dot(n, -rd), 0.0), 2.8);
+              vec3 rimCol = auraPalette(dot(n, vec3(0.4, 0.7, 0.2)) * 0.5 + t * 0.11, uAdmin);
               if (mat == 1.0) {
                 vec3 refl = reflect(rd, n);
-                vec3 env = auraPalette(refl.y * 0.5 + refl.x * 0.3 + t * 0.06);
-                float spec = pow(max(dot(refl, normalize(vec3(0.6, 0.8, 0.5))), 0.0), 24.0);
-                col = env * (0.35 + 0.95 * fres) + rimCol * fres * 1.8 + vec3(1.0) * spec * 0.9;
+                vec3 env = auraPalette(refl.y * 0.5 + refl.x * 0.3 + t * 0.08, uAdmin);
+                float spec = pow(max(dot(refl, normalize(vec3(0.6, 0.8, 0.5))), 0.0), 20.0);
+                col = env * (0.48 + 1.15 * fres) + rimCol * fres * 2.2 + vec3(1.0) * spec * 1.1;
               } else if (mat == 2.0) {
-                col = vec3(1.6, 0.58, 0.16) * (1.2 + fres * 2.0);
+                col = auraPalette(t * 0.18 + hp.y * 0.4, 1.0) * (1.45 + fres * 2.3);
               } else if (mat == 3.0) {
-                col = vec3(0.20, 1.35, 1.65) * (0.9 + fres * 1.5);
+                float pulse = 0.75 + 0.45 * sin(atan(hp.z, hp.x) * 5.0 - t * 4.5);
+                col = vec3(0.25, 1.55, 1.95) * pulse * (1.0 + fres * 1.8);
+              } else if (mat == 4.0) {
+                float pulse = 0.75 + 0.45 * sin(atan(hp.y, hp.x) * 6.0 + t * 3.8);
+                col = vec3(1.75, 0.46, 1.45) * pulse * (1.0 + fres * 1.8);
               } else {
-                col = vec3(1.45, 0.42, 1.15) * (0.9 + fres * 1.5);
+                col = vec3(0.35, 1.75, 1.05) * (0.95 + fres * 1.7);
               }
             }
 
-            col += auraPalette(t * 0.07 + centerDist * 0.25) * exp(-minCore * 5.5) * 0.28;
-            col += volAccum * mix(0.55, 0.55, uTheme);
+            float ang = atan(pScreen.y, pScreen.x);
+            float rays = pow(max(0.0, sin(ang * 7.0 + t * 0.9) * cos(ang * 4.0 - t * 0.6)), 2.0);
+            col += auraPalette(t * 0.09 + centerDist * 0.25 + ang * 0.16, uAdmin) * exp(-minCore * 3.6) * (0.62 + 0.45 * rays);
+            col += volAccum * mix(0.95, 0.68, uTheme);
+
+            vec2 starCell = floor(pScreen * 18.0);
+            float starHash = hash31(vec3(starCell, 1.0));
+            if (starHash > 0.92) {
+              vec2 sf = fract(pScreen * 18.0) - 0.5;
+              float twinkle = 0.5 + 0.5 * sin(t * 4.2 + starHash * 60.0);
+              col += auraPalette(starHash * 3.0 + t * 0.1, uAdmin) * exp(-dot(sf, sf) * 32.0) * twinkle * 1.8 * (1.0 - uTheme * 0.6);
+            }
+
             fragColor = vec4(col, 1.0);
           }
         `;
@@ -6103,33 +6180,18 @@
           uniform int uBrightPass;
 
           void main() {
-            float w[7] = float[7](0.19648255, 0.17466632, 0.12098536, 0.06559061, 0.02783468, 0.00924468, 0.00240229);
-            vec2 stepUv = uDir * 2.0 / uTexSize;
+            float w[5] = float[5](0.22702702, 0.19459459, 0.12162162, 0.05405405, 0.01621621);
+            vec2 stepUv = uDir * 2.4 / uTexSize;
             vec3 sum = vec3(0.0);
-            for (int i = -6; i <= 6; i++) {
+            for (int i = -4; i <= 4; i++) {
               vec3 c = texture(uTex, clamp(vUv + stepUv * float(i), 0.0, 1.0)).rgb;
               if (uBrightPass == 1) {
                 float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
-                c *= smoothstep(0.95, 1.85, luma);
+                c *= smoothstep(0.65, 1.45, luma);
               }
               sum += c * w[abs(i)];
             }
             fragColor = vec4(sum, 1.0);
-          }
-        `;
-
-        const temporalFS = `#version 300 es
-          precision highp float;
-          in vec2 vUv;
-          out vec4 fragColor;
-          uniform sampler2D uCurr;
-          uniform sampler2D uPrev;
-          uniform float uBlend;
-
-          void main() {
-            vec3 c = texture(uCurr, vUv).rgb;
-            vec3 p = texture(uPrev, vUv).rgb;
-            fragColor = vec4(mix(p, c, uBlend), 1.0);
           }
         `;
 
@@ -6139,7 +6201,6 @@
           out vec4 fragColor;
           uniform sampler2D uScene;
           uniform sampler2D uBloom;
-          uniform sampler2D uBloomQ;
           uniform float uTheme;
 
           vec3 aces(vec3 x) {
@@ -6147,14 +6208,14 @@
           }
 
           void main() {
-            vec2 off = (vUv - 0.5) * 0.0045;
+            vec2 off = (vUv - 0.5) * 0.0055;
             float r = texture(uScene, vUv + off).r;
             float g = texture(uScene, vUv).g;
             float b = texture(uScene, vUv - off).b;
-            vec3 bloom = texture(uBloom, vUv).rgb * 0.65 + texture(uBloomQ, vUv).rgb * 0.55;
-            vec3 col = vec3(r, g, b) + bloom * mix(0.42, 0.22, uTheme);
+            vec3 bloom = texture(uBloom, vUv).rgb;
+            vec3 col = vec3(r, g, b) + bloom * mix(0.68, 0.30, uTheme);
             col = pow(aces(col), vec3(1.0 / 2.2));
-            col *= 1.0 - dot(vUv - 0.5, vUv - 0.5) * mix(0.75, 0.10, uTheme);
+            col *= 1.0 - dot(vUv - 0.5, vUv - 0.5) * mix(0.55, 0.08, uTheme);
             fragColor = vec4(col, 1.0);
           }
         `;
@@ -6183,16 +6244,15 @@
         }
 
         const pRay = link(raymarchFS);
-        const pTemporal = link(temporalFS);
         const pBloom = link(bloomFS);
         const pComp = link(compFS);
-        if (!pRay || !pTemporal || !pBloom || !pComp) return false;
+        if (!pRay || !pBloom || !pComp) return false;
 
         const vao = gl.createVertexArray();
         gl.bindVertexArray(vao);
 
-        // 128^3 3D Noise Volume Texture (8 MB VRAM) for fine nebula filaments
-        const N3 = 128;
+        // Lightweight 64^3 3D Noise Volume Texture (1 MB VRAM, instant startup)
+        const N3 = 64;
         const noiseData = new Uint8Array(N3 * N3 * N3 * 4);
         let seed = 1337;
         for (let i = 0; i < noiseData.length; i++) {
@@ -6222,82 +6282,64 @@
           return { tex, fbo, w, h };
         }
 
-        let rtScene, rtAccumA, rtAccumB, rtBloomA, rtBloomB, rtBloomQA, rtBloomQB;
-        let curW = 0, curH = 0, firstFrame = true, accumIdx = 0;
-        function resize(w, h) {
-          for (const rt of [rtScene, rtAccumA, rtAccumB, rtBloomA, rtBloomB, rtBloomQA, rtBloomQB]) {
+        let rtScene, rtBloomA, rtBloomB;
+        let curW = 0, curH = 0, curRW = 0, curRH = 0;
+        function resize(w, h, rw, rh) {
+          for (const rt of [rtScene, rtBloomA, rtBloomB]) {
             if (rt) { gl.deleteTexture(rt.tex); gl.deleteFramebuffer(rt.fbo); }
           }
           canvas.width = w; canvas.height = h;
-          const bw = Math.max(2, Math.floor(w / 2));
-          const bh = Math.max(2, Math.floor(h / 2));
-          const qw = Math.max(2, Math.floor(w / 4));
-          const qh = Math.max(2, Math.floor(h / 4));
-          rtScene = makeTarget(w, h);
-          rtAccumA = makeTarget(w, h);
-          rtAccumB = makeTarget(w, h);
+          const bw = Math.max(2, Math.floor(rw * 0.55));
+          const bh = Math.max(2, Math.floor(rh * 0.55));
+          rtScene = makeTarget(rw, rh);
           rtBloomA = makeTarget(bw, bh);
           rtBloomB = makeTarget(bw, bh);
-          rtBloomQA = makeTarget(qw, qh);
-          rtBloomQB = makeTarget(qw, qh);
-          curW = w; curH = h;
-          firstFrame = true;
+          curW = w; curH = h; curRW = rw; curRH = rh;
         }
 
         const sz = getTargetSize();
-        resize(sz.w, sz.h);
+        resize(sz.w, sz.h, sz.rw, sz.rh);
         document.body.classList.add("gpu-active");
 
         const t0 = performance.now();
+        let lastDraw = 0;
         function frame(now) {
-          const next = getTargetSize();
-          if (next.w !== curW || next.h !== curH) resize(next.w, next.h);
+          requestAnimationFrame(frame);
+          if (document.hidden || now - lastDraw < 22) return; // Cap ~45fps so GPU stays ice cold
+          lastDraw = now;
 
-          pointer.x += (pointer.tx - pointer.x) * 0.06;
-          pointer.y += (pointer.ty - pointer.y) * 0.06;
-          themeVal += (targetTheme - themeVal) * 0.08;
+          const next = getTargetSize();
+          if (next.w !== curW || next.h !== curH) resize(next.w, next.h, next.rw, next.rh);
+
+          pointer.x += (pointer.tx - pointer.x) * 0.08;
+          pointer.y += (pointer.ty - pointer.y) * 0.08;
+          themeVal += (targetTheme - themeVal) * 0.1;
+          adminVal += (targetAdmin - adminVal) * 0.1;
           const elapsed = (now - t0) * 0.001;
 
-          // Pass 1: Raymarch
+          // Pass 1: Half-res Raymarch
           gl.bindFramebuffer(gl.FRAMEBUFFER, rtScene.fbo);
           gl.viewport(0, 0, rtScene.w, rtScene.h);
           gl.useProgram(pRay);
           gl.activeTexture(gl.TEXTURE0);
           gl.bindTexture(gl.TEXTURE_3D, noiseTex3D);
           gl.uniform1i(gl.getUniformLocation(pRay, "uNoise3D"), 0);
-          gl.uniform2f(gl.getUniformLocation(pRay, "uRes"), curW, curH);
+          gl.uniform2f(gl.getUniformLocation(pRay, "uRes"), curRW, curRH);
           gl.uniform2f(gl.getUniformLocation(pRay, "uMouse"), pointer.x, pointer.y);
           gl.uniform1f(gl.getUniformLocation(pRay, "uTime"), elapsed);
           gl.uniform1f(gl.getUniformLocation(pRay, "uTheme"), themeVal);
+          gl.uniform1f(gl.getUniformLocation(pRay, "uAdmin"), adminVal);
           gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-          // Pass 1b: Temporal Accumulation Ping-Pong
-          const rtPrev = accumIdx === 0 ? rtAccumA : rtAccumB;
-          const rtCurr = accumIdx === 0 ? rtAccumB : rtAccumA;
-          accumIdx = 1 - accumIdx;
-
-          gl.bindFramebuffer(gl.FRAMEBUFFER, rtCurr.fbo);
-          gl.viewport(0, 0, rtCurr.w, rtCurr.h);
-          gl.useProgram(pTemporal);
-          gl.activeTexture(gl.TEXTURE0);
-          gl.bindTexture(gl.TEXTURE_2D, rtScene.tex);
-          gl.uniform1i(gl.getUniformLocation(pTemporal, "uCurr"), 0);
-          gl.activeTexture(gl.TEXTURE1);
-          gl.bindTexture(gl.TEXTURE_2D, rtPrev.tex);
-          gl.uniform1i(gl.getUniformLocation(pTemporal, "uPrev"), 1);
-          gl.uniform1f(gl.getUniformLocation(pTemporal, "uBlend"), firstFrame ? 1.0 : 0.78);
-          gl.drawArrays(gl.TRIANGLES, 0, 3);
-          firstFrame = false;
-
-          // Pass 2: Half-res Bloom H + V
+          // Pass 2: Quarter-res Bloom H + V
           gl.bindFramebuffer(gl.FRAMEBUFFER, rtBloomA.fbo);
           gl.viewport(0, 0, rtBloomA.w, rtBloomA.h);
           gl.useProgram(pBloom);
           gl.activeTexture(gl.TEXTURE0);
-          gl.bindTexture(gl.TEXTURE_2D, rtCurr.tex);
+          gl.bindTexture(gl.TEXTURE_2D, rtScene.tex);
           gl.uniform1i(gl.getUniformLocation(pBloom, "uTex"), 0);
           gl.uniform2f(gl.getUniformLocation(pBloom, "uDir"), 1, 0);
-          gl.uniform2f(gl.getUniformLocation(pBloom, "uTexSize"), rtCurr.w, rtCurr.h);
+          gl.uniform2f(gl.getUniformLocation(pBloom, "uTexSize"), rtScene.w, rtScene.h);
           gl.uniform1i(gl.getUniformLocation(pBloom, "uBrightPass"), 1);
           gl.drawArrays(gl.TRIANGLES, 0, 3);
 
@@ -6309,40 +6351,18 @@
           gl.uniform1i(gl.getUniformLocation(pBloom, "uBrightPass"), 0);
           gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-          // Pass 3: Quarter-res Bloom H + V
-          gl.bindFramebuffer(gl.FRAMEBUFFER, rtBloomQA.fbo);
-          gl.viewport(0, 0, rtBloomQA.w, rtBloomQA.h);
-          gl.bindTexture(gl.TEXTURE_2D, rtBloomB.tex);
-          gl.uniform2f(gl.getUniformLocation(pBloom, "uDir"), 1, 0);
-          gl.uniform2f(gl.getUniformLocation(pBloom, "uTexSize"), rtBloomB.w, rtBloomB.h);
-          gl.uniform1i(gl.getUniformLocation(pBloom, "uBrightPass"), 0);
-          gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-          gl.bindFramebuffer(gl.FRAMEBUFFER, rtBloomQB.fbo);
-          gl.viewport(0, 0, rtBloomQB.w, rtBloomQB.h);
-          gl.bindTexture(gl.TEXTURE_2D, rtBloomQA.tex);
-          gl.uniform2f(gl.getUniformLocation(pBloom, "uDir"), 0, 1);
-          gl.uniform2f(gl.getUniformLocation(pBloom, "uTexSize"), rtBloomQA.w, rtBloomQA.h);
-          gl.uniform1i(gl.getUniformLocation(pBloom, "uBrightPass"), 0);
-          gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-          // Pass 4: Composite
+          // Pass 3: Upscaled Composite
           gl.bindFramebuffer(gl.FRAMEBUFFER, null);
           gl.viewport(0, 0, curW, curH);
           gl.useProgram(pComp);
           gl.activeTexture(gl.TEXTURE0);
-          gl.bindTexture(gl.TEXTURE_2D, rtCurr.tex);
+          gl.bindTexture(gl.TEXTURE_2D, rtScene.tex);
           gl.uniform1i(gl.getUniformLocation(pComp, "uScene"), 0);
           gl.activeTexture(gl.TEXTURE1);
           gl.bindTexture(gl.TEXTURE_2D, rtBloomB.tex);
           gl.uniform1i(gl.getUniformLocation(pComp, "uBloom"), 1);
-          gl.activeTexture(gl.TEXTURE2);
-          gl.bindTexture(gl.TEXTURE_2D, rtBloomQB.tex);
-          gl.uniform1i(gl.getUniformLocation(pComp, "uBloomQ"), 2);
           gl.uniform1f(gl.getUniformLocation(pComp, "uTheme"), themeVal);
           gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-          requestAnimationFrame(frame);
         }
 
         requestAnimationFrame(frame);
