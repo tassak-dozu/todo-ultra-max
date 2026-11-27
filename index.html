@@ -3023,16 +3023,7 @@
       display: none;
     }
 
-    /* Live Multiplayer Cursor Drawing Canvas & Pointer Overlays */
-    #cursor-draw-canvas {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      pointer-events: none;
-      z-index: 38;
-    }
-
+    /* Live Multiplayer Cursor Overlays */
     #remote-cursors-layer {
       position: fixed;
       inset: 0;
@@ -3233,13 +3224,10 @@
         <span class="stat-chip"><span class="stat-dot done"></span>Certified Done <strong id="stat-done">0</strong></span>
         <span class="stat-chip"><span class="stat-dot mcp"></span>Robot Moves <strong class="mono" id="stat-mcp">0</strong></span>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <button type="button" class="ticker-btn" id="clear-ink-btn" title="Wipe cursor drawings">🎨 Clear Ink</button>
-        <button type="button" class="ticker-btn" id="activity-toggle" title="Open the live gossip feed">
-          <span class="src-tag web" id="ticker-tag">LIVE</span>
-          <span id="ticker-text">Eavesdropping on the live stream...</span>
-        </button>
-      </div>
+      <button type="button" class="ticker-btn" id="activity-toggle" title="Open the live gossip feed">
+        <span class="src-tag web" id="ticker-tag">LIVE</span>
+        <span id="ticker-text">Eavesdropping on the live stream...</span>
+      </button>
     </div>
 
     <!-- Expandable Live Activity Drawer -->
@@ -3511,7 +3499,6 @@
     </div>
   </div>
 
-  <canvas id="cursor-draw-canvas" aria-hidden="true"></canvas>
   <div id="remote-cursors-layer" aria-hidden="true"></div>
   <script>
     const DEFAULT_API_BASE = "https://todo-ultra-max.mantikafasi.dev";
@@ -5482,35 +5469,14 @@
     })();
 
     // =========================================================================
-    // Collaborative Live Multiplayer Cursors & Neon Ink Drawing Canvas
+    // Collaborative Live Multiplayer Cursors (No Trails)
     // =========================================================================
-    (function initCollaborativeCursorDraw() {
-      const drawCanvas = document.getElementById("cursor-draw-canvas");
+    (function initCollaborativeCursors() {
       const cursorsLayer = document.getElementById("remote-cursors-layer");
-      const clearInkBtn = document.getElementById("clear-ink-btn");
-      if (!drawCanvas || !cursorsLayer) return;
+      if (!cursorsLayer) return;
 
-      const ctx = drawCanvas.getContext("2d");
-      let dpr = Math.min(window.devicePixelRatio || 1, 2);
-      let vw = Math.max(1, window.innerWidth);
-      let vh = Math.max(1, window.innerHeight);
-
-      function resizeCanvas() {
-        dpr = Math.min(window.devicePixelRatio || 1, 2);
-        vw = Math.max(1, window.innerWidth);
-        vh = Math.max(1, window.innerHeight);
-        drawCanvas.width = Math.floor(vw * dpr);
-        drawCanvas.height = Math.floor(vh * dpr);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
-      resizeCanvas();
-      window.addEventListener("resize", resizeCanvas, { passive: true });
-
-      const strokes = [];
-      const MAX_STROKES = 1400;
       const remoteCursors = new Map();
       let animRunning = false;
-      let selfPrev = null;
       let selfLastSentAt = 0;
 
       function ensureAnimLoop() {
@@ -5518,34 +5484,6 @@
           animRunning = true;
           requestAnimationFrame(tick);
         }
-      }
-
-      function addStrokeSegment(x1, y1, x2, y2, color, down) {
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const distSq = dx * dx + dy * dy;
-        if (distSq < 1 || distSq > 450 * 450) return;
-        strokes.push({
-          x1,
-          y1,
-          x2,
-          y2,
-          color: color || "#22d3ee",
-          width: down ? 5.5 : 2.8,
-          life: down ? 10500 : 4200,
-          born: performance.now(),
-        });
-        if (strokes.length > MAX_STROKES) {
-          strokes.splice(0, strokes.length - MAX_STROKES);
-        }
-        ensureAnimLoop();
-      }
-
-      function toBoardCoords(clientX, clientY) {
-        return {
-          cx: clientX - vw * 0.5,
-          cy: clientY + (window.scrollY || 0),
-        };
       }
 
       function createRemoteCursorNode(msg) {
@@ -5588,10 +5526,7 @@
             y,
             tx: x,
             ty: y,
-            lastDrawX: x,
-            lastDrawY: y,
             color,
-            down: Boolean(msg.down),
             lastSeen: performance.now(),
             ...dom,
           };
@@ -5604,12 +5539,8 @@
           }
           const nextLabel = msg.isAdmin ? `👑 ${msg.name || "ADMIN"}` : (msg.name || `User#${String(msg.peerId).slice(0, 4)}`);
           if (peer.tag.textContent !== nextLabel) peer.tag.textContent = nextLabel;
-          addStrokeSegment(peer.lastDrawX, peer.lastDrawY, x, y, color, Boolean(msg.down));
-          peer.lastDrawX = x;
-          peer.lastDrawY = y;
           peer.tx = x;
           peer.ty = y;
-          peer.down = Boolean(msg.down);
           peer.lastSeen = performance.now();
           peer.el.style.opacity = "1";
         }
@@ -5625,71 +5556,23 @@
         }
       };
 
-      function handleLocalMove(clientX, clientY, down) {
-        const { cx, cy } = toBoardCoords(clientX, clientY);
-        const selfColor = isAdmin ? "#fbbf24" : (myPeerColor || "#22d3ee");
-        if (selfPrev) {
-          addStrokeSegment(selfPrev.cx, selfPrev.cy, cx, cy, selfColor, down);
-        }
-        selfPrev = { cx, cy };
-
-        const now = performance.now();
-        if (wsConnected && now - selfLastSentAt >= 28) {
-          selfLastSentAt = now;
-          sendWs({
-            type: "cursor",
-            x: Math.round(cx),
-            y: Math.round(cy),
-            down,
-            name: playerName,
-          });
-        }
-      }
-
       window.addEventListener("pointermove", (e) => {
-        handleLocalMove(e.clientX, e.clientY, Boolean(e.buttons & 1));
+        const now = performance.now();
+        if (!wsConnected || now - selfLastSentAt < 28) return;
+        selfLastSentAt = now;
+        const cx = e.clientX - window.innerWidth * 0.5;
+        const cy = e.clientY + (window.scrollY || 0);
+        sendWs({
+          type: "cursor",
+          x: Math.round(cx),
+          y: Math.round(cy),
+          name: playerName,
+        });
       }, { passive: true });
-
-      window.addEventListener("pointerdown", (e) => {
-        selfPrev = toBoardCoords(e.clientX, e.clientY);
-        if (wsConnected) {
-          sendWs({
-            type: "cursor",
-            x: Math.round(selfPrev.cx),
-            y: Math.round(selfPrev.cy),
-            down: true,
-            name: playerName,
-          });
-        }
-      }, { passive: true });
-
-      window.addEventListener("pointerup", () => {
-        if (wsConnected && selfPrev) {
-          sendWs({
-            type: "cursor",
-            x: Math.round(selfPrev.cx),
-            y: Math.round(selfPrev.cy),
-            down: false,
-            name: playerName,
-          });
-        }
-      }, { passive: true });
-
-      window.addEventListener("pointerleave", () => {
-        selfPrev = null;
-      });
 
       window.addEventListener("scroll", () => {
-        if (strokes.length > 0 || remoteCursors.size > 0) ensureAnimLoop();
+        if (remoteCursors.size > 0) ensureAnimLoop();
       }, { passive: true });
-
-      if (clearInkBtn) {
-        clearInkBtn.addEventListener("click", () => {
-          strokes.length = 0;
-          ctx.clearRect(0, 0, vw, vh);
-          burstAtEl(clearInkBtn, 14);
-        });
-      }
 
       function tick(now) {
         if (document.hidden) {
@@ -5697,59 +5580,10 @@
           return;
         }
 
-        ctx.clearRect(0, 0, vw, vh);
+        const halfW = window.innerWidth * 0.5;
         const scrollY = window.scrollY || 0;
-        const halfW = vw * 0.5;
+        let moving = false;
 
-        // Draw & expire all active peer + local cursor strokes
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        for (let i = strokes.length - 1; i >= 0; i--) {
-          const s = strokes[i];
-          const age = now - s.born;
-          if (age >= s.life) {
-            strokes.splice(i, 1);
-            continue;
-          }
-          const alpha = Math.pow(1 - age / s.life, 1.4);
-          const sx1 = halfW + s.x1;
-          const sy1 = s.y1 - scrollY;
-          const sx2 = halfW + s.x2;
-          const sy2 = s.y2 - scrollY;
-
-          // Skip off-screen segments cleanly
-          if ((sy1 < -60 && sy2 < -60) || (sy1 > vh + 60 && sy2 > vh + 60)) continue;
-
-          // Outer neon glow
-          ctx.globalAlpha = alpha * 0.48;
-          ctx.strokeStyle = s.color;
-          ctx.lineWidth = s.width * 2.4;
-          ctx.beginPath();
-          ctx.moveTo(sx1, sy1);
-          ctx.lineTo(sx2, sy2);
-          ctx.stroke();
-
-          // Crisp colored core
-          ctx.globalAlpha = alpha * 0.92;
-          ctx.lineWidth = s.width;
-          ctx.beginPath();
-          ctx.moveTo(sx1, sy1);
-          ctx.lineTo(sx2, sy2);
-          ctx.stroke();
-
-          // Bright white specular filament
-          ctx.globalAlpha = alpha * 0.65;
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = Math.max(0.9, s.width * 0.34);
-          ctx.beginPath();
-          ctx.moveTo(sx1, sy1);
-          ctx.lineTo(sx2, sy2);
-          ctx.stroke();
-        }
-        ctx.globalAlpha = 1;
-
-        // Smoothly glide remote cursors & expire stale ones
-        let cursorsMoving = false;
         for (const [id, peer] of remoteCursors.entries()) {
           if (now - peer.lastSeen > 15000) {
             peer.el.remove();
@@ -5761,7 +5595,7 @@
           if (Math.abs(dx) > 0.2 || Math.abs(dy) > 0.2) {
             peer.x += dx * 0.28;
             peer.y += dy * 0.28;
-            cursorsMoving = true;
+            moving = true;
           } else {
             peer.x = peer.tx;
             peer.y = peer.ty;
@@ -5774,7 +5608,7 @@
           }
         }
 
-        if (strokes.length > 0 || cursorsMoving || remoteCursors.size > 0) {
+        if (moving || remoteCursors.size > 0) {
           requestAnimationFrame(tick);
         } else {
           animRunning = false;
