@@ -61,6 +61,8 @@ struct PeerState {
     cursor_skin: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cursor_aura: Option<String>,
     typing: bool,
     dragging_id: Option<String>,
     is_admin: bool,
@@ -376,6 +378,7 @@ struct KeyQuery {
     name: Option<String>,
     cursor_skin: Option<String>,
     title: Option<String>,
+    cursor_aura: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -1376,8 +1379,13 @@ async fn ws_handler(
         .as_deref()
         .map(|s| s.trim().chars().take(24).collect())
         .filter(|s: &String| !s.is_empty());
+    let initial_aura: Option<String> = q
+        .cursor_aura
+        .as_deref()
+        .map(|s| s.trim().chars().take(20).collect())
+        .filter(|s: &String| !s.is_empty());
     ws.on_upgrade(move |socket| {
-        handle_socket(socket, st, is_admin, initial_name, initial_skin, initial_title)
+        handle_socket(socket, st, is_admin, initial_name, initial_skin, initial_title, initial_aura)
     })
 }
 
@@ -1388,6 +1396,7 @@ async fn handle_socket(
     initial_name: Option<String>,
     initial_skin: Option<String>,
     initial_title: Option<String>,
+    initial_aura: Option<String>,
 ) {
     let peer_id = Uuid::new_v4().to_string()[..8].to_string();
     let color = {
@@ -1405,6 +1414,7 @@ async fn handle_socket(
                 name: initial_name,
                 cursor_skin: initial_skin,
                 title: initial_title,
+                cursor_aura: initial_aura,
                 typing: false,
                 dragging_id: None,
                 is_admin,
@@ -1530,11 +1540,17 @@ async fn handle_socket(
                                 .and_then(|v| v.as_str())
                                 .map(|s| s.trim().chars().take(24).collect())
                                 .filter(|s: &String| !s.is_empty());
+                            let next_aura: Option<String> = val
+                                .get("cursorAura")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.trim().chars().take(20).collect())
+                                .filter(|s: &String| !s.is_empty());
                             let mut changed = false;
                             if let Some(p) = st_recv.peers.lock().unwrap().get_mut(&pid_recv) {
-                                if p.cursor_skin != next_skin || p.title != next_title {
+                                if p.cursor_skin != next_skin || p.title != next_title || p.cursor_aura != next_aura {
                                     p.cursor_skin = next_skin;
                                     p.title = next_title;
+                                    p.cursor_aura = next_aura;
                                     changed = true;
                                 }
                             }
@@ -1557,12 +1573,12 @@ async fn handle_socket(
                                         .and_then(|v| v.as_str())
                                         .map(|n| n.trim().chars().take(24).collect())
                                         .filter(|n: &String| !n.is_empty());
-                                    let (stored_name, stored_skin, stored_title) = {
+                                    let (stored_name, stored_skin, stored_title, stored_aura) = {
                                         let peers = st_recv.peers.lock().unwrap();
                                         peers
                                             .get(&pid_recv)
-                                            .map(|p| (p.name.clone(), p.cursor_skin.clone(), p.title.clone()))
-                                            .unwrap_or((None, None, None))
+                                            .map(|p| (p.name.clone(), p.cursor_skin.clone(), p.title.clone(), p.cursor_aura.clone()))
+                                            .unwrap_or((None, None, None, None))
                                     };
                                     let name = incoming_name.or(stored_name);
                                     let payload = json!({
@@ -1573,6 +1589,7 @@ async fn handle_socket(
                                         "name": name,
                                         "cursorSkin": stored_skin,
                                         "title": stored_title,
+                                        "cursorAura": stored_aura,
                                         "x": x,
                                         "y": y,
                                         "down": down

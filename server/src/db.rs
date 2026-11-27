@@ -158,6 +158,7 @@ pub struct LootDrop {
 pub struct PlayerLoadout {
     pub cursor_skin: Option<String>,
     pub title: Option<String>,
+    pub aura: Option<String>,
 }
 
 pub struct LootDef {
@@ -171,28 +172,59 @@ pub struct LootDef {
 }
 
 pub const LOOT_POOL: &[LootDef] = &[
+    // Common
     LootDef { key: "coins_50", name: "Pocket Lint (+50 🪙)", icon: "🪙", rarity: "common", kind: "coins", value: "50", coin_bonus: 50 },
+    LootDef { key: "coins_125", name: "Couch Cushion Bitcoin (+125 🪙)", icon: "🛋️", rarity: "common", kind: "coins", value: "125", coin_bonus: 125 },
     LootDef { key: "roast_ratio", name: "Skill Issue (-0 🪙, +1 Ratio)", icon: "💀", rarity: "common", kind: "roast", value: "ratio", coin_bonus: 0 },
     LootDef { key: "roast_grass", name: "Touch Grass Permit: REVOKED", icon: "🌿", rarity: "common", kind: "roast", value: "grass", coin_bonus: 0 },
     LootDef { key: "roast_gold", name: "Edit: Thanks For The Gold Kind Stranger!", icon: "🏅", rarity: "common", kind: "roast", value: "gold", coin_bonus: 0 },
+    LootDef { key: "roast_nft", name: "Screenshotted JPEG ($0.00 Value)", icon: "🐒", rarity: "common", kind: "roast", value: "nft", coin_bonus: 0 },
     LootDef { key: "title_intern", name: "Title: 10x Intern", icon: "📎", rarity: "common", kind: "title", value: "10x INTERN 📎", coin_bonus: 0 },
+    LootDef { key: "title_lurker", name: "Title: Certified Lurker", icon: "👀", rarity: "common", kind: "title", value: "LURKER 👀", coin_bonus: 0 },
+    LootDef { key: "cursor_banana", name: "Cursor: Tactical Banana", icon: "🍌", rarity: "common", kind: "cursor", value: "banana", coin_bonus: 0 },
+    // Rare
     LootDef { key: "coins_200", name: "Stimulus Check (+200 🪙)", icon: "💵", rarity: "rare", kind: "coins", value: "200", coin_bonus: 200 },
+    LootDef { key: "coins_350", name: "Bug Bounty Payout (+350 🪙)", icon: "🐛", rarity: "rare", kind: "coins", value: "350", coin_bonus: 350 },
     LootDef { key: "roast_fedora", name: "\"Erm Actually\" Fedora of Cope", icon: "🤓", rarity: "rare", kind: "roast", value: "fedora", coin_bonus: 0 },
     LootDef { key: "roast_karma", name: "Downvoted to Oblivion (-420 Karma)", icon: "⬇️", rarity: "rare", kind: "roast", value: "karma", coin_bonus: 0 },
+    LootDef { key: "roast_ban", name: "Permabanned From r/productivity", icon: "🔨", rarity: "rare", kind: "roast", value: "ban", coin_bonus: 0 },
     LootDef { key: "title_degen", name: "Title: Solana Degen", icon: "🎰", rarity: "rare", kind: "title", value: "SOLANA DEGEN 🎰", coin_bonus: 0 },
+    LootDef { key: "title_caffeine", name: "Title: 6th Espresso", icon: "☕", rarity: "rare", kind: "title", value: "ESPRESSO ☕", coin_bonus: 0 },
     LootDef { key: "cursor_bolt", name: "Cursor: Cyber Lightning", icon: "⚡", rarity: "rare", kind: "cursor", value: "bolt", coin_bonus: 0 },
+    LootDef { key: "cursor_shuriken", name: "Cursor: Ninja Shuriken", icon: "✴️", rarity: "rare", kind: "cursor", value: "shuriken", coin_bonus: 0 },
+    LootDef { key: "aura_cyber", name: "Aura: Cyber Pulse Ring", icon: "💠", rarity: "rare", kind: "aura", value: "cyber", coin_bonus: 0 },
+    LootDef { key: "aura_toxic", name: "Aura: Biohazard Reactor", icon: "☢️", rarity: "rare", kind: "aura", value: "toxic", coin_bonus: 0 },
+    // Epic
     LootDef { key: "coins_600", name: "VC Seed Round (+600 🪙)", icon: "💰", rarity: "epic", kind: "coins", value: "600", coin_bonus: 600 },
+    LootDef { key: "coins_1000", name: "Series A Pitch Deck (+1,000 🪙)", icon: "📈", rarity: "epic", kind: "coins", value: "1000", coin_bonus: 1000 },
+    LootDef { key: "roast_receipt", name: "Non-Refundable Pixel Receipt", icon: "🧾", rarity: "epic", kind: "roast", value: "receipt", coin_bonus: 0 },
     LootDef { key: "title_mod", name: "Title: Certified Reddit Mod", icon: "🤓", rarity: "epic", kind: "title", value: "REDDIT MOD 🤓", coin_bonus: 0 },
     LootDef { key: "title_chad", name: "Title: Giga Chad", icon: "🗿", rarity: "epic", kind: "title", value: "GIGA CHAD 🗿", coin_bonus: 0 },
+    LootDef { key: "title_bugmaker", name: "Title: Pushes To Main", icon: "💣", rarity: "epic", kind: "title", value: "PUSHES TO MAIN 💣", coin_bonus: 0 },
     LootDef { key: "cursor_flame", name: "Cursor: Hellfire Blade", icon: "🔥", rarity: "epic", kind: "cursor", value: "flame", coin_bonus: 0 },
     LootDef { key: "cursor_diamond", name: "Cursor: Liquid Prism", icon: "💎", rarity: "epic", kind: "cursor", value: "diamond", coin_bonus: 0 },
+    LootDef { key: "cursor_sword", name: "Cursor: Moonlight Greatsword", icon: "⚔️", rarity: "epic", kind: "cursor", value: "sword", coin_bonus: 0 },
+    LootDef { key: "aura_sakura", name: "Aura: Anime Protagonist", icon: "🌸", rarity: "epic", kind: "aura", value: "sakura", coin_bonus: 0 },
+    LootDef { key: "aura_inferno", name: "Aura: Hellfire Halo", icon: "🔥", rarity: "epic", kind: "aura", value: "inferno", coin_bonus: 0 },
+    // Legendary
     LootDef { key: "coins_1800", name: "Insider Alpha (+1,800 🪙)", icon: "🏦", rarity: "legendary", kind: "coins", value: "1800", coin_bonus: 1800 },
+    LootDef { key: "coins_3333", name: "Golden Goose Bailout (+3,333 🪙)", icon: "🪿", rarity: "legendary", kind: "coins", value: "3333", coin_bonus: 3333 },
+    LootDef { key: "roast_audit", name: "IRS Aura Audit Notice", icon: "🕵️", rarity: "legendary", kind: "roast", value: "audit", coin_bonus: 0 },
     LootDef { key: "title_whale", name: "Title: Aura Whale", icon: "🐋", rarity: "legendary", kind: "title", value: "AURA WHALE 🐋", coin_bonus: 0 },
+    LootDef { key: "title_crab", name: "Title: Fearless Rustacean", icon: "🦀", rarity: "legendary", kind: "title", value: "RUSTACEAN 🦀", coin_bonus: 0 },
     LootDef { key: "cursor_crown", name: "Cursor: Sovereign Crown", icon: "👑", rarity: "legendary", kind: "cursor", value: "crown", coin_bonus: 0 },
     LootDef { key: "cursor_ufo", name: "Cursor: Cosmic Abductor", icon: "🛸", rarity: "legendary", kind: "cursor", value: "ufo", coin_bonus: 0 },
+    LootDef { key: "cursor_brain", name: "Cursor: 400 IQ Galaxy Brain", icon: "🧠", rarity: "legendary", kind: "cursor", value: "brain", coin_bonus: 0 },
+    LootDef { key: "aura_rust", name: "Aura: Zero-GC Blazing Rust", icon: "🦀", rarity: "legendary", kind: "aura", value: "rust", coin_bonus: 0 },
+    LootDef { key: "aura_void", name: "Aura: Event Horizon Singularity", icon: "🕳️", rarity: "legendary", kind: "aura", value: "void", coin_bonus: 0 },
+    // Mythic
     LootDef { key: "coins_5000", name: "RUGPULL JACKPOT (+5,000 🪙)", icon: "🤑", rarity: "mythic", kind: "coins", value: "5000", coin_bonus: 5000 },
+    LootDef { key: "coins_10000", name: "ELON TWEET PUMP (+10,000 🪙)", icon: "🚀", rarity: "mythic", kind: "coins", value: "10000", coin_bonus: 10000 },
     LootDef { key: "title_overlord", name: "Title: AI Overlord", icon: "🤖", rarity: "mythic", kind: "title", value: "AI OVERLORD 🤖", coin_bonus: 0 },
+    LootDef { key: "title_oligarch", name: "Title: Liquid Glass Oligarch", icon: "💸", rarity: "mythic", kind: "title", value: "OLIGARCH 💸", coin_bonus: 0 },
     LootDef { key: "cursor_scythe", name: "Cursor: Mythic Reaper", icon: "💀", rarity: "mythic", kind: "cursor", value: "scythe", coin_bonus: 0 },
+    LootDef { key: "cursor_vortex", name: "Cursor: Celestial Star-Blade", icon: "🌀", rarity: "mythic", kind: "cursor", value: "vortex", coin_bonus: 0 },
+    LootDef { key: "aura_godmode", name: "Aura: Ascended Prism God", icon: "🌈", rarity: "mythic", kind: "aura", value: "godmode", coin_bonus: 0 },
 ];
 
 pub fn crate_meta(crate_id: &str) -> Option<(&'static str, i64)> {
@@ -204,47 +236,41 @@ pub fn crate_meta(crate_id: &str) -> Option<(&'static str, i64)> {
     }
 }
 
-fn loot_weight(crate_id: &str, rarity: &str) -> u32 {
+fn roll_rarity(crate_id: &str) -> &'static str {
+    let rnd = (Uuid::new_v4().as_u128() % 1000) as u32;
     match crate_id {
-        "standard" => match rarity {
-            "common" => 420,
-            "rare" => 220,
-            "epic" => 65,
-            "legendary" => 18,
-            "mythic" => 4,
-            _ => 0,
-        },
-        "glass" => match rarity {
-            "common" => 110,
-            "rare" => 260,
-            "epic" => 170,
-            "legendary" => 55,
-            "mythic" => 14,
-            _ => 0,
-        },
-        "aura" => match rarity {
-            "common" => 0,
-            "rare" => 90,
-            "epic" => 240,
-            "legendary" => 160,
-            "mythic" => 55,
-            _ => 0,
-        },
-        _ => 0,
+        "standard" => {
+            if rnd < 540 { "common" }
+            else if rnd < 820 { "rare" }
+            else if rnd < 935 { "epic" }
+            else if rnd < 985 { "legendary" }
+            else { "mythic" }
+        }
+        "glass" => {
+            if rnd < 140 { "common" }
+            else if rnd < 520 { "rare" }
+            else if rnd < 810 { "epic" }
+            else if rnd < 955 { "legendary" }
+            else { "mythic" }
+        }
+        "aura" => {
+            if rnd < 160 { "rare" }
+            else if rnd < 570 { "epic" }
+            else if rnd < 875 { "legendary" }
+            else { "mythic" }
+        }
+        _ => "common",
     }
 }
 
 fn roll_loot(crate_id: &str) -> &'static LootDef {
-    let total: u32 = LOOT_POOL.iter().map(|i| loot_weight(crate_id, i.rarity)).sum();
-    let rnd = (Uuid::new_v4().as_u128() % (total.max(1) as u128)) as u32;
-    let mut acc = 0u32;
-    for item in LOOT_POOL {
-        acc += loot_weight(crate_id, item.rarity);
-        if rnd < acc {
-            return item;
-        }
+    let tier = roll_rarity(crate_id);
+    let matches: Vec<&'static LootDef> = LOOT_POOL.iter().filter(|i| i.rarity == tier).collect();
+    if matches.is_empty() {
+        return &LOOT_POOL[0];
     }
-    &LOOT_POOL[0]
+    let idx = (Uuid::new_v4().as_u128() % (matches.len() as u128)) as usize;
+    matches[idx]
 }
 
 pub struct TodoDB {
@@ -389,12 +415,28 @@ impl TodoDB {
                player_id TEXT PRIMARY KEY,
                cursor_skin TEXT,
                title TEXT,
+               aura TEXT,
                updated_at INTEGER NOT NULL
              );",
         )
         .map_err(|e| e.to_string())?;
 
         // Safe schema migrations for pre-existing DBs
+        let mut loadout_cols = Vec::new();
+        {
+            let mut stmt = conn
+                .prepare("PRAGMA table_info(player_loadout)")
+                .map_err(|e| e.to_string())?;
+            let rows = stmt
+                .query_map([], |r| r.get::<_, String>(1))
+                .map_err(|e| e.to_string())?;
+            for r in rows.flatten() {
+                loadout_cols.push(r);
+            }
+        }
+        if !loadout_cols.iter().any(|c| c == "aura") {
+            let _ = conn.execute("ALTER TABLE player_loadout ADD COLUMN aura TEXT", []);
+        }
         let mut cols = Vec::new();
         {
             let mut stmt = conn
@@ -1238,12 +1280,13 @@ impl TodoDB {
 
     fn get_loadout_conn(conn: &Connection, player_id: &str) -> PlayerLoadout {
         conn.query_row(
-            "SELECT cursor_skin, title FROM player_loadout WHERE player_id = ?",
+            "SELECT cursor_skin, title, aura FROM player_loadout WHERE player_id = ?",
             params![player_id],
             |r| {
                 Ok(PlayerLoadout {
                     cursor_skin: r.get(0)?,
                     title: r.get(1)?,
+                    aura: r.get(2)?,
                 })
             },
         )
@@ -1371,6 +1414,12 @@ impl TodoDB {
             match slot {
                 "cursor" => loadout.cursor_skin = None,
                 "title" => loadout.title = None,
+                "aura" => loadout.aura = None,
+                "all" => {
+                    loadout.cursor_skin = None;
+                    loadout.title = None;
+                    loadout.aura = None;
+                }
                 _ => return Err("Invalid slot to clear".to_string()),
             }
         } else if let Some(iid) = item_id {
@@ -1386,15 +1435,16 @@ impl TodoDB {
             match kind.as_str() {
                 "cursor" => loadout.cursor_skin = Some(value),
                 "title" => loadout.title = Some(value),
-                _ => return Err("Coins can't be equipped — spend 'em!".to_string()),
+                "aura" => loadout.aura = Some(value),
+                _ => return Err("That item can't be equipped — spend or flex it!".to_string()),
             }
         } else {
             return Err("Provide itemId or clear slot".to_string());
         }
 
         conn.execute(
-            "INSERT OR REPLACE INTO player_loadout (player_id, cursor_skin, title, updated_at) VALUES (?, ?, ?, ?)",
-            params![&player_id, &loadout.cursor_skin, &loadout.title, now_ms()],
+            "INSERT OR REPLACE INTO player_loadout (player_id, cursor_skin, title, aura, updated_at) VALUES (?, ?, ?, ?, ?)",
+            params![&player_id, &loadout.cursor_skin, &loadout.title, &loadout.aura, now_ms()],
         )
         .map_err(|e| e.to_string())?;
         Ok(loadout)
