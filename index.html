@@ -4049,7 +4049,7 @@
                 if (dist > 14.0) { break; }
               }
 
-              var col = mix(vec3<f32>(0.016, 0.020, 0.042), vec3<f32>(0.90, 0.93, 0.99), u.theme);
+              var col = mix(vec3<f32>(0.002, 0.003, 0.007), vec3<f32>(0.90, 0.93, 0.99), u.theme);
 
               var volAccum = vec3<f32>(0.0);
               var volT = 0.8;
@@ -4061,7 +4061,7 @@
                   let radial = length(vp);
                   let swirl = vp * 0.55 + vec3<f32>(t * 0.09, -t * 0.07, t * 0.05);
                   let n = fbm3(swirl);
-                  let density = smoothstep(0.42, 0.85, n) * exp(-radial * 0.28) * 0.14;
+                  let density = smoothstep(0.54, 0.90, n) * exp(-radial * 0.42) * 0.075;
                   let nebCol = auraPalette(n * 1.4 + radial * 0.12 - t * 0.04);
                   volAccum += nebCol * density;
                   volT += stepVol;
@@ -4089,9 +4089,9 @@
                 }
               }
 
-              let halo = exp(-minCoreDist * 4.5) * 0.55;
+              let halo = exp(-minCoreDist * 5.5) * 0.28;
               col += auraPalette(t * 0.07 + centerDist * 0.25) * halo;
-              col += volAccum * mix(1.65, 0.62, u.theme);
+              col += volAccum * mix(0.55, 0.55, u.theme);
 
               let gridWave = sin(pScreen.x * 16.0 + t * 0.4) * sin(pScreen.y * 16.0 - t * 0.3);
               col += vec3<f32>(0.25, 0.55, 0.95) * max(gridWave - 0.94, 0.0) * 1.2 * (1.0 - u.theme * 0.6);
@@ -4120,7 +4120,7 @@
                 var c = textureSample(inTex, samp, clamp(in.uv + stepUv * f32(i), vec2<f32>(0.0), vec2<f32>(1.0))).rgb;
                 if (bp.brightPass == 1) {
                   let luma = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
-                  c = c * smoothstep(0.45, 0.95, luma);
+                  c = c * smoothstep(0.62, 1.05, luma);
                 }
                 sum += c * weights[abs(i)];
               }
@@ -4155,11 +4155,11 @@
               let b = textureSample(sceneTex, samp, in.uv - offset).b;
               let bloom = textureSample(bloomTex, samp, in.uv).rgb;
 
-              var col = decodeHDR(vec3<f32>(r, g, b)) + decodeHDR(bloom) * mix(0.9, 0.25, cp.theme);
+              var col = decodeHDR(vec3<f32>(r, g, b)) + decodeHDR(bloom) * mix(0.42, 0.22, cp.theme);
               col = aces(col);
               col = pow(col, vec3<f32>(1.0 / 2.2));
 
-              let vig = 1.0 - dot(in.uv - 0.5, in.uv - 0.5) * mix(0.55, 0.10, cp.theme);
+              let vig = 1.0 - dot(in.uv - 0.5, in.uv - 0.5) * mix(0.75, 0.10, cp.theme);
               col *= vig;
               return vec4<f32>(col, 1.0);
             }
@@ -4479,7 +4479,7 @@
               if (dist > 14.0) break;
             }
 
-            vec3 col = mix(vec3(0.016, 0.020, 0.042), vec3(0.90, 0.93, 0.99), uTheme);
+            vec3 col = mix(vec3(0.002, 0.003, 0.007), vec3(0.90, 0.93, 0.99), uTheme);
 
             vec3 volAccum = vec3(0.0);
             float volT = 0.8;
@@ -4492,7 +4492,7 @@
                 float n = fbm3(vp * 0.55 + vec3(t * 0.09, -t * 0.07, t * 0.05));
                 float fine = texture(uNoise3D, vp * 0.18 + vec3(t * 0.02)).r;
                 n = mix(n, fine, 0.28);
-                float dens = smoothstep(0.40, 0.84, n) * exp(-radial * 0.28) * 0.15;
+                float dens = smoothstep(0.54, 0.90, n) * exp(-radial * 0.42) * 0.075;
                 volAccum += auraPalette(n * 1.4 + radial * 0.12 - t * 0.04) * dens;
                 volT += stepVol;
               }
@@ -4517,8 +4517,8 @@
               }
             }
 
-            col += auraPalette(t * 0.07 + centerDist * 0.25) * exp(-minCore * 4.5) * 0.55;
-            col += volAccum * mix(1.65, 0.62, uTheme);
+            col += auraPalette(t * 0.07 + centerDist * 0.25) * exp(-minCore * 5.5) * 0.28;
+            col += volAccum * mix(0.55, 0.55, uTheme);
             fragColor = vec4(col, 1.0);
           }
         `;
@@ -4540,7 +4540,7 @@
               vec3 c = texture(uTex, clamp(vUv + stepUv * float(i), 0.0, 1.0)).rgb;
               if (uBrightPass == 1) {
                 float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
-                c *= smoothstep(0.65, 1.45, luma);
+                c *= smoothstep(0.95, 1.85, luma);
               }
               sum += c * w[abs(i)];
             }
@@ -4582,9 +4582,9 @@
             float g = texture(uScene, vUv).g;
             float b = texture(uScene, vUv - off).b;
             vec3 bloom = texture(uBloom, vUv).rgb * 0.65 + texture(uBloomQ, vUv).rgb * 0.55;
-            vec3 col = vec3(r, g, b) + bloom * mix(0.85, 0.25, uTheme);
+            vec3 col = vec3(r, g, b) + bloom * mix(0.42, 0.22, uTheme);
             col = pow(aces(col), vec3(1.0 / 2.2));
-            col *= 1.0 - dot(vUv - 0.5, vUv - 0.5) * mix(0.55, 0.10, uTheme);
+            col *= 1.0 - dot(vUv - 0.5, vUv - 0.5) * mix(0.75, 0.10, uTheme);
             fragColor = vec4(col, 1.0);
           }
         `;
