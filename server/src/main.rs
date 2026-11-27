@@ -69,6 +69,10 @@ struct AppState {
     peers: Mutex<HashMap<String, PeerState>>,
     activity: Mutex<VecDeque<ActivityEvent>>,
     rate_buckets: Mutex<HashMap<String, (u32, i64)>>,
+    mcp_write_min_buckets: Mutex<HashMap<String, (u32, i64)>>,
+    mcp_write_hr_buckets: Mutex<HashMap<String, (u32, i64)>>,
+    mcp_read_buckets: Mutex<HashMap<String, (u32, i64)>>,
+    mcp_global_min: Mutex<(u32, i64)>,
     admin_login_buckets: Mutex<HashMap<String, (u32, i64)>>,
     mcp_calls: AtomicU64,
     api_key_hash: Option<[u8; 32]>,
@@ -207,6 +211,50 @@ impl AppState {
         }
         entry.0 += 1;
         true
+    }
+
+    fn check_window_bucket(
+        map_mutex: &Mutex<HashMap<String, (u32, i64)>>,
+        key: &str,
+        limit: u32,
+        window_ms: i64,
+    ) -> bool {
+        let now = now_ms();
+        let mut map = map_mutex.lock().unwrap();
+        let entry = map.entry(key.to_string()).or_insert((0, now + window_ms));
+        if now >= entry.1 {
+            *entry = (1, now + window_ms);
+            return true;
+        }
+        if entry.0 >= limit {
+            return false;
+        }
+        entry.0 += 1;
+        true
+    }
+
+    fn check_mcp_rate_limit(&self, ip: &str, is_write: bool) -> Result<(), &'static str> {
+        if !Self::check_window_bucket(&self.mcp_read_buckets, ip, 20, 60_000) {
+            return Err("MCP rate limit exceeded (max 20 requests/min per IP)");
+        }
+        if is_write {
+            if !Self::check_window_bucket(&self.mcp_write_min_buckets, ip, 4, 60_000) {
+                return Err("MCP write rate limit exceeded (max 4 writes/min per IP)");
+            }
+            if !Self::check_window_bucket(&self.mcp_write_hr_buckets, ip, 15, 3_600_000) {
+                return Err("MCP write rate limit exceeded (max 15 writes/hour per IP)");
+            }
+            let now = now_ms();
+            let mut g = self.mcp_global_min.lock().unwrap();
+            if now >= g.1 {
+                *g = (1, now + 60_000);
+            } else if g.0 >= 12 {
+                return Err("Global MCP write cooldown active (max 12 writes/min server-wide)");
+            } else {
+                g.0 += 1;
+            }
+        }
+        Ok(())
     }
 
     fn record_activity(
@@ -1038,12 +1086,14 @@ async fn mcp_post(
     }
 
     let ip = st.client_ip(&headers);
-    if is_write && !st.check_rate_limit(&ip) {
-        let id = payload.get("id").cloned().unwrap_or(Value::Null);
-        return json_resp(
-            StatusCode::TOO_MANY_REQUESTS,
-            json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32000, "message": "Rate limit exceeded" } }),
-        );
+    if !st.is_admin(&headers, q.admin_token.as_deref()) {
+        if let Err(msg) = st.check_mcp_rate_limit(&ip, is_write) {
+            let id = payload.get("id").cloned().unwrap_or(Value::Null);
+            return json_resp(
+                StatusCode::TOO_MANY_REQUESTS,
+                json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32000, "message": msg } }),
+            );
+        }
     }
 
     if method == "tools/call" {
@@ -1350,6 +1400,10 @@ async fn main() {
         peers: Mutex::new(HashMap::new()),
         activity: Mutex::new(VecDeque::new()),
         rate_buckets: Mutex::new(HashMap::new()),
+        mcp_write_min_buckets: Mutex::new(HashMap::new()),
+        mcp_write_hr_buckets: Mutex::new(HashMap::new()),
+        mcp_read_buckets: Mutex::new(HashMap::new()),
+        mcp_global_min: Mutex::new((0, 0)),
         admin_login_buckets: Mutex::new(HashMap::new()),
         mcp_calls: AtomicU64::new(0),
         api_key_hash,

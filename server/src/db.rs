@@ -77,6 +77,7 @@ pub struct Todo {
     pub position: i64,
     pub created_at: i64,
     pub completed_at: Option<i64>,
+    pub created_by: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -169,6 +170,7 @@ fn row_to_todo(row: &rusqlite::Row<'_>) -> rusqlite::Result<Todo> {
     let position: i64 = row.get(5)?;
     let created_at: i64 = row.get(6)?;
     let completed_at: Option<i64> = row.get(7)?;
+    let raw_created_by: String = row.get(8).unwrap_or_else(|_| "web".to_string());
 
     let status = if is_valid_status(&raw_status) {
         raw_status
@@ -183,6 +185,11 @@ fn row_to_todo(row: &rusqlite::Row<'_>) -> rusqlite::Result<Todo> {
         "medium".to_string()
     };
     let done = status == "done";
+    let created_by = if raw_created_by.trim().is_empty() {
+        "web".to_string()
+    } else {
+        raw_created_by
+    };
 
     Ok(Todo {
         id,
@@ -193,6 +200,7 @@ fn row_to_todo(row: &rusqlite::Row<'_>) -> rusqlite::Result<Todo> {
         position,
         created_at,
         completed_at,
+        created_by,
     })
 }
 
@@ -223,7 +231,8 @@ impl TodoDB {
                done INTEGER NOT NULL DEFAULT 0,
                position INTEGER NOT NULL DEFAULT 0,
                created_at INTEGER NOT NULL,
-               completed_at INTEGER
+               completed_at INTEGER,
+               created_by TEXT NOT NULL DEFAULT 'web'
              );
              CREATE INDEX IF NOT EXISTS idx_todos_created_at ON todos(created_at DESC);
              CREATE TABLE IF NOT EXISTS wallets (
@@ -292,6 +301,12 @@ impl TodoDB {
         if !cols.iter().any(|c| c == "completed_at") {
             let _ = conn.execute("ALTER TABLE todos ADD COLUMN completed_at INTEGER", []);
         }
+        if !cols.iter().any(|c| c == "created_by") {
+            let _ = conn.execute(
+                "ALTER TABLE todos ADD COLUMN created_by TEXT NOT NULL DEFAULT 'web'",
+                [],
+            );
+        }
 
         Ok(Self {
             conn: Mutex::new(conn),
@@ -324,7 +339,7 @@ impl TodoDB {
         }
 
         let mut sql =
-            "SELECT id, text, status, priority, done, position, created_at, completed_at FROM todos"
+            "SELECT id, text, status, priority, done, position, created_at, completed_at, created_by FROM todos"
                 .to_string();
         if !clauses.is_empty() {
             sql.push_str(" WHERE ");
@@ -351,7 +366,7 @@ impl TodoDB {
 
     fn get_conn(conn: &Connection, id: &str) -> Option<Todo> {
         conn.query_row(
-            "SELECT id, text, status, priority, done, position, created_at, completed_at FROM todos WHERE id = ?",
+            "SELECT id, text, status, priority, done, position, created_at, completed_at, created_by FROM todos WHERE id = ?",
             params![id],
             row_to_todo,
         )
@@ -365,6 +380,16 @@ impl TodoDB {
         raw_text: &str,
         status: Option<&str>,
         priority: Option<&str>,
+    ) -> Result<Todo, String> {
+        self.add_with_source(raw_text, status, priority, "web")
+    }
+
+    pub fn add_with_source(
+        &self,
+        raw_text: &str,
+        status: Option<&str>,
+        priority: Option<&str>,
+        raw_source: &str,
     ) -> Result<Todo, String> {
         let text = raw_text.trim();
         if text.is_empty() {
@@ -384,6 +409,11 @@ impl TodoDB {
 
         let status_str = status.filter(|s| is_valid_status(s)).unwrap_or("todo");
         let priority_str = priority.filter(|p| is_valid_priority(p)).unwrap_or("medium");
+        let created_by = if raw_source.trim().is_empty() {
+            "web".to_string()
+        } else {
+            raw_source.trim().to_string()
+        };
         let done_int: i64 = if status_str == "done" { 1 } else { 0 };
         let min_pos: Option<i64> = conn
             .query_row(
@@ -399,8 +429,8 @@ impl TodoDB {
         let completed_at = if done_int == 1 { Some(created_at) } else { None };
 
         conn.execute(
-            "INSERT INTO todos (id, text, status, priority, done, position, created_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            params![id, text, status_str, priority_str, done_int, position, created_at, completed_at],
+            "INSERT INTO todos (id, text, status, priority, done, position, created_at, completed_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            params![id, text, status_str, priority_str, done_int, position, created_at, completed_at, created_by],
         )
         .map_err(|e| e.to_string())?;
 
@@ -413,6 +443,7 @@ impl TodoDB {
             position,
             created_at,
             completed_at,
+            created_by,
         })
     }
 
@@ -515,6 +546,7 @@ impl TodoDB {
                 position: next_position,
                 created_at: existing.created_at,
                 completed_at: next_completed_at,
+                created_by: existing.created_by,
             },
             resolution,
         )))
@@ -545,6 +577,17 @@ impl TodoDB {
         let conn = self.conn.lock().unwrap();
         let changes = conn
             .execute("DELETE FROM todos WHERE status = 'done' OR done = 1", [])
+            .map_err(|e| e.to_string())?;
+        Ok(changes as i64)
+    }
+
+    pub fn clear_completed_by_source(&self, source: &str) -> Result<i64, String> {
+        let conn = self.conn.lock().unwrap();
+        let changes = conn
+            .execute(
+                "DELETE FROM todos WHERE (status = 'done' OR done = 1) AND created_by = ?",
+                params![source],
+            )
             .map_err(|e| e.to_string())?;
         Ok(changes as i64)
     }

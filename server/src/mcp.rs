@@ -77,7 +77,7 @@ fn tools_schema() -> Value {
         },
         {
             "name": "delete_todo",
-            "description": "Delete a single task card from the shared board by ID.",
+            "description": "Delete a single task card from the shared board by ID (restricted to tasks originally created by MCP).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -89,7 +89,7 @@ fn tools_schema() -> Value {
         },
         {
             "name": "clear_completed",
-            "description": "Delete all tasks in the Done column.",
+            "description": "Delete completed tasks in the Done column that were originally created by MCP.",
             "inputSchema": {
                 "type": "object",
                 "properties": {},
@@ -216,7 +216,7 @@ where
                     };
                     let status = args.and_then(|a| a.get("status")).and_then(|v| v.as_str());
                     let priority = args.and_then(|a| a.get("priority")).and_then(|v| v.as_str());
-                    match db.add(text, status, priority) {
+                    match db.add_with_source(text, status, priority, "mcp") {
                         Ok(todo) => {
                             on_mutate(McpMutationInfo {
                                 resolution: None,
@@ -295,6 +295,21 @@ where
                     let Some(card_id) = args.and_then(|a| a.get("id")).and_then(|v| v.as_str()) else {
                         return (200, Some(rpc_result(id, tool_failure("Missing string argument: id"))));
                     };
+                    let Some(existing) = db.get(card_id) else {
+                        return (
+                            200,
+                            Some(rpc_result(id, tool_failure(&format!("Todo not found: {card_id}")))),
+                        );
+                    };
+                    if existing.created_by != "mcp" {
+                        return (
+                            200,
+                            Some(rpc_result(
+                                id,
+                                tool_failure("Permission denied: MCP can only delete tasks that MCP originally created."),
+                            )),
+                        );
+                    }
                     match db.delete(card_id) {
                         Ok((true, resolution)) => {
                             on_mutate(McpMutationInfo {
@@ -317,12 +332,12 @@ where
                         Err(e) => (200, Some(rpc_result(id, tool_failure(&e)))),
                     }
                 }
-                "clear_completed" => match db.clear_completed() {
+                "clear_completed" => match db.clear_completed_by_source("mcp") {
                     Ok(count) => {
                         if count > 0 {
                             on_mutate(McpMutationInfo {
                                 resolution: None,
-                                custom_summary: None,
+                                custom_summary: Some(format!("Robot cleared {count} MCP done card(s)")),
                                 card_id: None,
                             });
                         }
