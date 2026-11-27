@@ -3306,6 +3306,7 @@
         <button type="button" class="ghost-btn admin-btn" id="admin-btn" title="Admin Aura Mode">👑 Admin</button>
         <button type="button" class="ghost-btn key-btn" id="key-btn">🔑 API Key</button>
         <button type="button" class="ghost-btn" id="mcp-btn">🤖 MCP</button>
+        <button type="button" class="ghost-btn" id="sfx-btn" title="Toggle casino & lootbox sounds">🔊 SFX</button>
         <button type="button" class="ghost-btn" id="theme-btn" aria-label="Toggle theme">☀️ Flashbang</button>
       </div>
     </header>
@@ -3640,9 +3641,16 @@
         <button type="button" class="ghost-btn" id="player-name-save">Save Tag</button>
       </div>
       <div class="telemetry-strip" style="margin-bottom:10px">
-        <span class="stat-chip">Balance <strong class="mono" id="wallet-bal">1,000 🪙</strong></span>
+        <span class="stat-chip">Cash &amp; Coins <strong class="mono" id="wallet-bal">1,000 🪙 ($100.00)</strong></span>
         <span class="stat-chip">Record <strong class="mono" id="wallet-record">0W / 0L</strong></span>
         <button type="button" class="ghost-btn" id="bailout-btn">💸 Bailout (+500)</button>
+      </div>
+      <div class="telemetry-strip" style="margin-bottom:10px">
+        <span class="stat-chip">🎰 Cash Spin (up to 15x!)</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="ghost-btn" id="spin-50-btn">💵 Spin 50 🪙 ($5)</button>
+          <button type="button" class="add-btn" id="spin-250-btn" style="padding:6px 12px;font-size:0.76rem">💎 High-Roller 250 🪙 ($25)</button>
+        </div>
       </div>
       <div class="key-feedback" id="wallet-feedback"></div>
       <div class="activity-head"><span>👑 Richest Degens</span></div>
@@ -5206,18 +5214,152 @@
     const betFeedback = document.getElementById("bet-feedback");
     const betRecentList = document.getElementById("bet-recent-list");
 
+    // === CASINO, GAMBLING & LOOTBOX SOUND SYNTHESIZER (WEB AUDIO) ===
+    const sfx = (() => {
+      const btn = document.getElementById("sfx-btn");
+      let enabled = localStorage.getItem("board.sfx") !== "off";
+      let ac = null;
+
+      function updateBtn() {
+        if (btn) btn.textContent = enabled ? "🔊 SFX" : "🔇 Muted";
+      }
+      updateBtn();
+
+      if (btn) {
+        btn.addEventListener("click", () => {
+          enabled = !enabled;
+          localStorage.setItem("board.sfx", enabled ? "on" : "off");
+          updateBtn();
+          if (enabled) chipClick();
+        });
+      }
+
+      function ctx() {
+        if (!enabled) return null;
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return null;
+        if (!ac) ac = new AudioCtx();
+        if (ac.state === "suspended") ac.resume().catch(() => {});
+        return ac;
+      }
+
+      function tone(freq, type, startOffset, dur, vol = 0.14, endFreq = null) {
+        const c = ctx();
+        if (!c) return;
+        const t = c.currentTime + startOffset;
+        const osc = c.createOscillator();
+        const g = c.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, t);
+        if (endFreq !== null) {
+          osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), t + dur);
+        }
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        osc.connect(g);
+        g.connect(c.destination);
+        osc.start(t);
+        osc.stop(t + dur + 0.02);
+      }
+
+      function chipClick(pitchShift = 1) {
+        tone(1450 * pitchShift, "triangle", 0, 0.045, 0.11, 780 * pitchShift);
+        tone(2900 * pitchShift, "sine", 0.004, 0.03, 0.06, 1800 * pitchShift);
+      }
+
+      function betPlaced() {
+        chipClick(1.1);
+        tone(784, "triangle", 0.04, 0.09, 0.12);
+        tone(1046.5, "sine", 0.09, 0.16, 0.14);
+        tone(1568, "sine", 0.14, 0.24, 0.12);
+      }
+
+      function betWon() {
+        const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5, 1567.98, 2093.0];
+        notes.forEach((f, i) => tone(f, i % 2 ? "triangle" : "sine", i * 0.055, 0.28, 0.13));
+      }
+
+      function betLost() {
+        tone(311.13, "sawtooth", 0.0, 0.22, 0.08, 293.66);
+        tone(277.18, "sawtooth", 0.24, 0.22, 0.08, 261.63);
+        tone(246.94, "sawtooth", 0.48, 0.42, 0.09, 174.61);
+      }
+
+      function bailout() {
+        tone(659.25, "triangle", 0, 0.08, 0.12);
+        tone(987.77, "sine", 0.07, 0.22, 0.14);
+      }
+
+      function equip() {
+        tone(620, "sine", 0, 0.06, 0.10, 930);
+        tone(1240, "triangle", 0.05, 0.12, 0.11);
+      }
+
+      function scheduleReelTicks(totalMs = 3400) {
+        if (!enabled) return;
+        const steps = 28;
+        for (let i = 0; i < steps; i++) {
+          const frac = i / steps;
+          // Accelerate delay exponentially near the end to match cubic-bezier(0.08, 0.90, 0.14, 1)
+          const ms = Math.pow(frac, 2.35) * (totalMs - 90);
+          setTimeout(() => chipClick(0.85 + frac * 0.4), ms);
+        }
+      }
+
+      function unbox(rarity, kind) {
+        if (kind === "roast") {
+          tone(220, "sawtooth", 0, 0.18, 0.10, 145);
+          tone(185, "sawtooth", 0.18, 0.36, 0.11, 95);
+          return;
+        }
+        if (rarity === "common") {
+          tone(523.25, "sine", 0, 0.12, 0.12);
+          tone(659.25, "sine", 0.07, 0.20, 0.12);
+        } else if (rarity === "rare") {
+          [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, "triangle", i * 0.055, 0.26, 0.13));
+        } else if (rarity === "epic") {
+          [440, 554.37, 659.25, 880, 1108.73].forEach((f, i) => tone(f, "triangle", i * 0.05, 0.34, 0.14));
+        } else if (rarity === "legendary") {
+          tone(146.83, "triangle", 0, 0.45, 0.15, 73.42);
+          [587.33, 739.99, 880, 1174.66, 1479.98, 1760].forEach((f, i) => tone(f, "sine", i * 0.05, 0.45, 0.14));
+        } else {
+          // Mythic drop fanfare
+          tone(110, "sawtooth", 0, 0.55, 0.12, 220);
+          [523.25, 659.25, 783.99, 1046.5, 1318.5, 1567.98, 2093, 2637].forEach((f, i) =>
+            tone(f, i % 2 ? "sawtooth" : "triangle", i * 0.045, 0.55, 0.13)
+          );
+        }
+      }
+
+      return { chipClick, betPlaced, betWon, betLost, bailout, equip, scheduleReelTicks, unbox };
+    })();
+
+    let walletLoadedOnce = false;
+
+    function formatCash(coins) {
+      return `$${(Number(coins || 0) / 10).toFixed(2)}`;
+    }
+
     function updateWalletPill() {
-      walletBtn.textContent = `🪙 ${wallet.balance.toLocaleString()}`;
+      walletBtn.textContent = `🪙 ${wallet.balance.toLocaleString()} (${formatCash(wallet.balance)})`;
     }
 
     async function fetchWallet() {
       try {
+        const prevWins = wallet.wins || 0;
+        const prevLosses = wallet.losses || 0;
         const data = await api(
           `/api/wallet?playerId=${encodeURIComponent(playerId)}&name=${encodeURIComponent(playerName)}`
         );
         if (data.wallet) wallet = data.wallet;
         if (Array.isArray(data.bets)) myBets = data.bets;
         if (Array.isArray(data.leaderboard)) leaderboard = data.leaderboard;
+        if (walletLoadedOnce) {
+          if (wallet.wins > prevWins) sfx.betWon();
+          else if (wallet.losses > prevLosses) sfx.betLost();
+        }
+        walletLoadedOnce = true;
         updateWalletPill();
         if (walletModal.classList.contains("open")) renderWalletModal();
       } catch {}
@@ -5225,7 +5367,7 @@
 
     function renderWalletModal() {
       playerNameInput.value = wallet.name || playerName;
-      walletBalEl.textContent = `${wallet.balance.toLocaleString()} 🪙`;
+      walletBalEl.textContent = `${wallet.balance.toLocaleString()} 🪙 (${formatCash(wallet.balance)})`;
       walletRecordEl.textContent = `${wallet.wins}W / ${wallet.losses}L`;
       bailoutBtn.disabled = wallet.balance >= 100;
 
@@ -5267,10 +5409,10 @@
           right.className = `mono bet-${b.status}`;
           right.textContent =
             b.status === "won"
-              ? `WON +${b.payout} 🪙`
+              ? `WON +${b.payout} 🪙 (${formatCash(b.payout)})`
               : b.status === "lost"
                 ? `LOST -${b.amount} 🪙`
-                : `OPEN ${b.amount} 🪙`;
+                : `OPEN ${b.amount} 🪙 (${formatCash(b.amount)})`;
           row.append(left, right);
           myBetsListEl.appendChild(row);
         }
@@ -5321,6 +5463,7 @@
         btn.className = `bucket-card${selectedBucket === b && !expired ? " selected" : ""}`;
         btn.disabled = expired;
         btn.addEventListener("click", () => {
+          sfx.chipClick();
           selectedBucket = b;
           renderBetModal();
         });
@@ -5455,6 +5598,46 @@
       walletFeedback.textContent = `Username updated to "${wallet.name || playerName}"!`;
     });
 
+    const spin50Btn = document.getElementById("spin-50-btn");
+    const spin250Btn = document.getElementById("spin-250-btn");
+
+    async function doMoneySpin(wager, btnEl) {
+      if (spin50Btn) spin50Btn.disabled = true;
+      if (spin250Btn) spin250Btn.disabled = true;
+      sfx.scheduleReelTicks(550);
+      walletFeedback.className = "key-feedback";
+      walletFeedback.textContent = `Spinning ${wager} 🪙 (${formatCash(wager)})...`;
+      try {
+        const res = await api("/api/wallet/spin", {
+          method: "POST",
+          body: JSON.stringify({ playerId, name: playerName, wager }),
+        });
+        await new Promise((r) => setTimeout(r, 560));
+        wallet = res.wallet;
+        updateWalletPill();
+        renderWalletModal();
+        if (res.payout > 0) {
+          sfx.betWon();
+          burstAtEl(btnEl, res.payout >= wager * 3 ? 34 : 18);
+          walletFeedback.className = "key-feedback ok";
+          walletFeedback.textContent = `${res.label} → WON +${res.payout.toLocaleString()} 🪙 (${formatCash(res.payout)})!`;
+        } else {
+          sfx.betLost();
+          walletFeedback.className = "key-feedback err";
+          walletFeedback.textContent = `${res.label} (-${wager} 🪙)`;
+        }
+      } catch (err) {
+        walletFeedback.className = "key-feedback err";
+        walletFeedback.textContent = err.message;
+      } finally {
+        if (spin50Btn) spin50Btn.disabled = false;
+        if (spin250Btn) spin250Btn.disabled = false;
+      }
+    }
+
+    if (spin50Btn) spin50Btn.addEventListener("click", () => doMoneySpin(50, spin50Btn));
+    if (spin250Btn) spin250Btn.addEventListener("click", () => doMoneySpin(250, spin250Btn));
+
     bailoutBtn.addEventListener("click", async () => {
       try {
         const res = await api("/api/wallet/bailout", {
@@ -5462,6 +5645,7 @@
           body: JSON.stringify({ playerId, name: playerName }),
         });
         wallet = res.wallet;
+        sfx.bailout();
         updateWalletPill();
         renderWalletModal();
         walletFeedback.className = "key-feedback ok";
@@ -5479,6 +5663,7 @@
 
     document.querySelectorAll(".chip-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
+        sfx.chipClick(1.15);
         const v = btn.dataset.chip;
         betAmountInput.value = v === "all" ? String(Math.max(10, wallet.balance)) : v;
       });
@@ -5505,6 +5690,7 @@
         });
         wallet = res.wallet;
         if (Array.isArray(res.bets)) myBets = res.bets;
+        sfx.betPlaced();
         updateWalletPill();
         burstAtEl(betSubmit, 22);
         betFeedback.className = "key-feedback ok";
@@ -5753,6 +5939,7 @@
           body: JSON.stringify({ playerId, itemId, clear: clearSlot }),
         });
         if (data.loadout) playerLoadout = data.loadout;
+        sfx.equip();
         syncCosmeticsWs();
         renderLootboxModal();
         showToast("✨ Cosmetics equipped live!", "web");
@@ -5807,6 +5994,7 @@
     crateGrid.querySelectorAll(".crate-card").forEach((btn) => {
       btn.addEventListener("click", () => {
         if (spinningLoot) return;
+        sfx.chipClick();
         selectedCrateId = btn.dataset.crate;
         crateGrid.querySelectorAll(".crate-card").forEach((b) => b.classList.toggle("selected", b === btn));
       });
@@ -5875,17 +6063,20 @@
 
         lootReel.style.transition = "transform 3.4s cubic-bezier(0.08, 0.90, 0.14, 1)";
         lootReel.style.transform = `translateX(${targetX.toFixed(1)}px)`;
+        sfx.scheduleReelTicks(3400);
 
         setTimeout(() => {
           spinningLoot = false;
           lootOpenBtn.disabled = false;
           lootboxFeedback.textContent = "";
+          sfx.unbox(drop.rarity, drop.kind);
           renderLootboxModal();
 
           lootReveal.className = `loot-reveal open rar-${drop.rarity}`;
           lootReveal.innerHTML = "";
           const info = document.createElement("div");
-          info.innerHTML = `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--rar-col);font-weight:800">${drop.rarity} UNBOXED!</div><div style="font-size:1rem;font-weight:850">${drop.icon} ${drop.name}</div>`;
+          const cashLine = drop.coinBonus > 0 ? ` · +${formatCash(drop.coinBonus)} Cash!` : "";
+          info.innerHTML = `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--rar-col);font-weight:800">${drop.rarity} UNBOXED!${cashLine}</div><div style="font-size:1rem;font-weight:850">${drop.icon} ${drop.name}</div>`;
           lootReveal.appendChild(info);
 
           if (drop.kind === "cursor" || drop.kind === "title") {

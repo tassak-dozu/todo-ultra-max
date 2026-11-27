@@ -446,6 +446,14 @@ struct BailoutBody {
 }
 
 #[derive(Deserialize)]
+struct SpinBody {
+    #[serde(rename = "playerId")]
+    player_id: Option<String>,
+    name: Option<String>,
+    wager: Option<i64>,
+}
+
+#[derive(Deserialize)]
 struct PlaceBetBody {
     #[serde(rename = "playerId")]
     player_id: Option<String>,
@@ -975,6 +983,55 @@ async fn bailout_wallet(
             );
             st.broadcast_sync(Some(&ev), None);
             json_resp(StatusCode::OK, json!({ "wallet": wallet, "granted": granted }))
+        }
+        Err(msg) => json_resp(StatusCode::BAD_REQUEST, json!({ "error": msg })),
+    }
+}
+
+async fn spin_wallet(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<KeyQuery>,
+    Json(body): Json<SpinBody>,
+) -> Response {
+    if !st.authorize(&headers, q.api_key.as_deref(), true) {
+        return json_resp(StatusCode::UNAUTHORIZED, json!({ "error": "API key required" }));
+    }
+    let ip = st.client_ip(&headers);
+    if !st.check_rate_limit(&ip) {
+        return json_resp(
+            StatusCode::TOO_MANY_REQUESTS,
+            json!({ "error": "Chill out, rate limit hit" }),
+        );
+    }
+    let Some(pid) = body.player_id.as_deref() else {
+        return json_resp(StatusCode::BAD_REQUEST, json!({ "error": "playerId required" }));
+    };
+    let wager = body.wager.unwrap_or(50);
+    match st.db.money_spin(pid, body.name.as_deref(), wager) {
+        Ok((wallet, payout, label)) => {
+            if payout >= wager * 3 {
+                let usd = (payout as f64) / 10.0;
+                let ev = st.record_activity(
+                    "bet",
+                    "web",
+                    format!(
+                        "💵 {} hit {label} → won +{payout} 🪙 (${usd:.2})!",
+                        wallet.name
+                    ),
+                    None,
+                );
+                st.broadcast_sync(Some(&ev), None);
+            }
+            json_resp(
+                StatusCode::OK,
+                json!({
+                    "wallet": wallet,
+                    "wager": wager,
+                    "payout": payout,
+                    "label": label
+                }),
+            )
         }
         Err(msg) => json_resp(StatusCode::BAD_REQUEST, json!({ "error": msg })),
     }
@@ -1655,6 +1712,7 @@ async fn main() {
         .route("/api/todos/{id}", patch(patch_todo).delete(delete_todo))
         .route("/api/wallet", get(get_wallet))
         .route("/api/wallet/bailout", post(bailout_wallet))
+        .route("/api/wallet/spin", post(spin_wallet))
         .route("/api/leaderboard", get(get_leaderboard))
         .route("/api/bets", post(place_bet))
         .route("/api/lootboxes", get(get_lootboxes))

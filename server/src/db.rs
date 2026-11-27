@@ -883,6 +883,63 @@ impl TodoDB {
         Ok((wallet, BAILOUT_AMOUNT))
     }
 
+    pub fn money_spin(
+        &self,
+        player_id: &str,
+        raw_name: Option<&str>,
+        wager: i64,
+    ) -> Result<(Wallet, i64, &'static str), String> {
+        if wager != 50 && wager != 250 {
+            return Err("Pick a 50 🪙 or 250 🪙 spin!".to_string());
+        }
+        let conn = self.conn.lock().unwrap();
+        let mut wallet = Self::get_or_create_wallet_conn(&conn, player_id, raw_name)?;
+        if wallet.balance < wager {
+            return Err(format!(
+                "Need {wager} 🪙 to spin (you have {} 🪙)!",
+                wallet.balance
+            ));
+        }
+
+        let roll = (Uuid::new_v4().as_u128() % 100) as u32;
+        let (mult, label) = if roll < 48 {
+            (0.0, "BUST 💀 House took your lunch money")
+        } else if roll < 76 {
+            (1.8, "💵 Cash Out (1.8x)")
+        } else if roll < 92 {
+            (3.0, "💰 Money Surge (3x)")
+        } else if roll < 98 {
+            (6.0, "🤑 Big Cash Bag (6x)")
+        } else {
+            (15.0, "👑💵 MEGA CASH JACKPOT (15x)")
+        };
+
+        let payout = ((wager as f64) * mult).round() as i64;
+        let now = now_ms();
+        wallet.balance = wallet.balance - wager + payout;
+        if payout > 0 {
+            wallet.wins += 1;
+            wallet.total_won += payout;
+        } else {
+            wallet.losses += 1;
+        }
+
+        conn.execute(
+            "UPDATE wallets SET balance = ?, wins = ?, losses = ?, total_won = ?, updated_at = ? WHERE player_id = ?",
+            params![
+                wallet.balance,
+                wallet.wins,
+                wallet.losses,
+                wallet.total_won,
+                now,
+                &wallet.player_id
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+
+        Ok((wallet, payout, label))
+    }
+
     pub fn place_bet(
         &self,
         player_id: &str,
@@ -1013,7 +1070,18 @@ impl TodoDB {
                 } else {
                     *amount
                 };
-                let min_bonus = ((*amount as f64) * 1.5).round() as i64;
+                let mult = match winning_bucket {
+                    "speedrun" => 2.5,
+                    "today" => 2.0,
+                    "eventually" => 1.7,
+                    _ => 1.5,
+                };
+                let speed_bonus = match winning_bucket {
+                    "speedrun" => 150,
+                    "today" => 50,
+                    _ => 0,
+                };
+                let min_bonus = ((*amount as f64) * mult).round() as i64 + speed_bonus;
                 let payout = raw_share.max(min_bonus);
                 total_paid += payout;
 
