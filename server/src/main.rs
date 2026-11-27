@@ -417,13 +417,13 @@ impl AppState {
             .unwrap_or_else(|| "Player B".to_string());
         let wal_a = self
             .db
-            .get_wallet_state(&trade.a.player_id, Some(&name_a))
-            .map(|(w, _)| w.balance)
+            .get_or_create_wallet(&trade.a.player_id, Some(&name_a))
+            .map(|w| w.balance)
             .unwrap_or(0);
         let wal_b = self
             .db
-            .get_wallet_state(&trade.b.player_id, Some(&name_b))
-            .map(|(w, _)| w.balance)
+            .get_or_create_wallet(&trade.b.player_id, Some(&name_b))
+            .map(|w| w.balance)
             .unwrap_or(0);
 
         let offered_a: Vec<_> = inv_a
@@ -1837,8 +1837,8 @@ async fn handle_socket(
                                 let _ = direct_tx.send(json!({ "type": "pvp_error", "error": "That player went offline!" }).to_string());
                                 continue;
                             };
-                            let from_bal = st_recv.db.get_wallet_state(&from_pid, Some(&from_name)).map(|x| x.0.balance).unwrap_or(0);
-                            let to_bal = st_recv.db.get_wallet_state(&to_pid, Some(&to_name)).map(|x| x.0.balance).unwrap_or(0);
+                            let from_bal = st_recv.db.get_or_create_wallet(&from_pid, Some(&from_name)).map(|w| w.balance).unwrap_or(0);
+                            let to_bal = st_recv.db.get_or_create_wallet(&to_pid, Some(&to_name)).map(|w| w.balance).unwrap_or(0);
                             if from_bal < wager {
                                 let _ = direct_tx.send(json!({ "type": "pvp_error", "error": format!("Need {wager} 🪙 to challenge (you have {from_bal} 🪙)") }).to_string());
                                 continue;
