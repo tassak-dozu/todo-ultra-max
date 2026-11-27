@@ -1645,9 +1645,67 @@
     }
 
     .modal-foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+
+    /* Flashbang HDR Overexposure Overlay */
+    .flashbang-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      background: #ffffff;
+      background: color(rec2100-pq 1 1 1);
+      backdrop-filter: brightness(1) contrast(1) saturate(1);
+      -webkit-backdrop-filter: brightness(1) contrast(1) saturate(1);
+    }
+    .flashbang-overlay img {
+      position: absolute;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+    }
+    .flashbang-overlay.is-flashing {
+      visibility: visible;
+      animation: flashbang-detonate 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes flashbang-detonate {
+      0% {
+        opacity: 1;
+        backdrop-filter: brightness(12) contrast(3) saturate(0);
+        -webkit-backdrop-filter: brightness(12) contrast(3) saturate(0);
+      }
+      35% {
+        opacity: 1;
+        backdrop-filter: brightness(12) contrast(3) saturate(0);
+        -webkit-backdrop-filter: brightness(12) contrast(3) saturate(0);
+      }
+      100% {
+        opacity: 0;
+        backdrop-filter: brightness(1) contrast(1) saturate(1);
+        -webkit-backdrop-filter: brightness(1) contrast(1) saturate(1);
+      }
+    }
+    body.is-flashbanged .shell {
+      animation: flashbang-shake 0.24s linear;
+    }
+    @keyframes flashbang-shake {
+      0%, 100% { transform: translate(0, 0); }
+      15% { transform: translate(-6px, 4px); }
+      30% { transform: translate(6px, -5px); }
+      45% { transform: translate(-5px, -3px); }
+      60% { transform: translate(5px, 4px); }
+      75% { transform: translate(-3px, 2px); }
+    }
   </style>
 </head>
 <body>
+  <div id="flashbang-overlay" class="flashbang-overlay" aria-hidden="true">
+    <img src="data:image/avif;base64,AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUEAAAD4bWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAAAAAAAOcGl0bQAAAAAAAQAAAB5pbG9jAAAAAEQAAAEAAQAAAAEAAAEgAAAAGQAAAChpaW5mAAAAAAABAAAAGmluZmUCAAAAAAEAAGF2MDFDb2xvcgAAAAB3aXBycAAAAFdpcGNvAAAAFGlzcGUAAAAAAAAAEAAAABAAAAAQcGl4aQAAAAADCgoKAAAADGF2MUOBIEAAAAAAE2NvbHJuY2x4AAkAEAAJgAAAAAxjbGxpJxAnEAAAABhpcG1hAAAAAAAAAAEAAQUBAoMEBQAAACFtZGF0EgAKCDgM/9jCRAJkMgsQAAAAFLeHy5vu4A==" alt="" decoding="sync" onerror="this.style.display='none'" />
+  </div>
   <canvas id="gpu-bg" aria-hidden="true"></canvas>
   <div class="aura">
     <div class="aura-blob aura-1"></div>
@@ -2087,6 +2145,32 @@
     const mcpSnippet = document.getElementById("mcp-snippet");
 
     // Theme
+    const flashbangOverlay = document.getElementById("flashbang-overlay");
+    let flashbangTimer = null;
+
+    function triggerFlashbang() {
+      try {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      } catch (_) {}
+
+      if (navigator.vibrate) navigator.vibrate([40, 20, 120]);
+
+      if (flashbangOverlay) {
+        flashbangOverlay.classList.remove("is-flashing");
+        document.body.classList.remove("is-flashbanged");
+        void flashbangOverlay.offsetWidth;
+        flashbangOverlay.classList.add("is-flashing");
+        document.body.classList.add("is-flashbanged");
+        clearTimeout(flashbangTimer);
+        flashbangTimer = setTimeout(() => {
+          flashbangOverlay.classList.remove("is-flashing");
+          document.body.classList.remove("is-flashbanged");
+        }, 2550);
+      }
+    }
+
     applyTheme(localStorage.getItem("board.theme") || "dark");
     function applyTheme(theme) {
       document.documentElement.setAttribute("data-theme", theme);
@@ -2094,7 +2178,9 @@
       themeBtn.textContent = theme === "dark" ? "☀️ Flashbang" : "🌙 Dark Aura";
     }
     themeBtn.addEventListener("click", () => {
-      applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
+      const nextTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      if (nextTheme === "light") triggerFlashbang();
+      applyTheme(nextTheme);
     });
 
     // MCP snippet updates dynamically with API key
