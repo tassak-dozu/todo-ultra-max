@@ -412,6 +412,11 @@ struct AdminNukeBody {
 }
 
 #[derive(Deserialize)]
+struct LockTodoBody {
+    locked: Option<bool>,
+}
+
+#[derive(Deserialize)]
 struct WalletQuery {
     #[serde(rename = "playerId")]
     player_id: Option<String>,
@@ -936,6 +941,41 @@ async fn delete_todo(
             )
         }
         Ok((false, _)) => json_resp(StatusCode::NOT_FOUND, json!({ "error": "Todo not found" })),
+        Err(e) if e.contains("ADMIN AURA") => json_resp(StatusCode::FORBIDDEN, json!({ "error": e })),
+        Err(e) => json_resp(StatusCode::INTERNAL_SERVER_ERROR, json!({ "error": e })),
+    }
+}
+
+async fn toggle_todo_lock(
+    State(st): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    Json(body): Json<LockTodoBody>,
+) -> Response {
+    if !st.is_admin(&headers, None) {
+        return json_resp(
+            StatusCode::UNAUTHORIZED,
+            json!({ "error": "👑 Admin Aura Mode required to seal/unseal cards!" }),
+        );
+    }
+    match st.db.set_locked(&id, body.locked) {
+        Ok(Some(todo)) => {
+            let short: String = todo.text.chars().take(42).collect();
+            let summary = if todo.locked {
+                format!("👑🔒 ADMIN sealed \"{short}\" with Immortal Aura!")
+            } else {
+                format!("👑🔓 ADMIN unsealed \"{short}\"")
+            };
+            let ev = st.record_activity(
+                if todo.locked { "locked" } else { "unlocked" },
+                "web",
+                summary,
+                Some(todo.id.clone()),
+            );
+            st.broadcast_sync(Some(&ev), None);
+            json_resp(StatusCode::OK, json!({ "ok": true, "todo": todo }))
+        }
+        Ok(None) => json_resp(StatusCode::NOT_FOUND, json!({ "error": "Todo not found" })),
         Err(e) => json_resp(StatusCode::INTERNAL_SERVER_ERROR, json!({ "error": e })),
     }
 }
@@ -1727,6 +1767,7 @@ async fn main() {
             get(list_todos).post(create_todo).delete(clear_completed),
         )
         .route("/api/todos/{id}", patch(patch_todo).delete(delete_todo))
+        .route("/api/todos/{id}/lock", post(toggle_todo_lock))
         .route("/api/wallet", get(get_wallet))
         .route("/api/wallet/bailout", post(bailout_wallet))
         .route("/api/wallet/spin", post(spin_wallet))

@@ -78,6 +78,7 @@ pub struct Todo {
     pub created_at: i64,
     pub completed_at: Option<i64>,
     pub created_by: String,
+    pub locked: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -305,6 +306,7 @@ fn row_to_todo(row: &rusqlite::Row<'_>) -> rusqlite::Result<Todo> {
     let created_at: i64 = row.get(6)?;
     let completed_at: Option<i64> = row.get(7)?;
     let raw_created_by: String = row.get(8).unwrap_or_else(|_| "web".to_string());
+    let locked_int: i64 = row.get(9).unwrap_or(0);
 
     let status = if is_valid_status(&raw_status) {
         raw_status
@@ -335,6 +337,7 @@ fn row_to_todo(row: &rusqlite::Row<'_>) -> rusqlite::Result<Todo> {
         created_at,
         completed_at,
         created_by,
+        locked: locked_int != 0,
     })
 }
 
@@ -366,7 +369,8 @@ impl TodoDB {
                position INTEGER NOT NULL DEFAULT 0,
                created_at INTEGER NOT NULL,
                completed_at INTEGER,
-               created_by TEXT NOT NULL DEFAULT 'web'
+               created_by TEXT NOT NULL DEFAULT 'web',
+               locked INTEGER NOT NULL DEFAULT 0
              );
              CREATE INDEX IF NOT EXISTS idx_todos_created_at ON todos(created_at DESC);
              CREATE TABLE IF NOT EXISTS wallets (
@@ -476,6 +480,12 @@ impl TodoDB {
                 [],
             );
         }
+        if !cols.iter().any(|c| c == "locked") {
+            let _ = conn.execute(
+                "ALTER TABLE todos ADD COLUMN locked INTEGER NOT NULL DEFAULT 0",
+                [],
+            );
+        }
 
         Ok(Self {
             conn: Mutex::new(conn),
@@ -508,7 +518,7 @@ impl TodoDB {
         }
 
         let mut sql =
-            "SELECT id, text, status, priority, done, position, created_at, completed_at, created_by FROM todos"
+            "SELECT id, text, status, priority, done, position, created_at, completed_at, created_by, locked FROM todos"
                 .to_string();
         if !clauses.is_empty() {
             sql.push_str(" WHERE ");
@@ -535,7 +545,7 @@ impl TodoDB {
 
     fn get_conn(conn: &Connection, id: &str) -> Option<Todo> {
         conn.query_row(
-            "SELECT id, text, status, priority, done, position, created_at, completed_at, created_by FROM todos WHERE id = ?",
+            "SELECT id, text, status, priority, done, position, created_at, completed_at, created_by, locked FROM todos WHERE id = ?",
             params![id],
             row_to_todo,
         )
@@ -613,6 +623,7 @@ impl TodoDB {
             created_at,
             completed_at,
             created_by,
+            locked: false,
         })
     }
 
@@ -716,14 +727,33 @@ impl TodoDB {
                 created_at: existing.created_at,
                 completed_at: next_completed_at,
                 created_by: existing.created_by,
+                locked: existing.locked,
             },
             resolution,
         )))
     }
 
+    pub fn set_locked(&self, id: &str, target: Option<bool>) -> Result<Option<Todo>, String> {
+        let conn = self.conn.lock().unwrap();
+        let Some(mut existing) = Self::get_conn(&conn, id) else {
+            return Ok(None);
+        };
+        let next_locked = target.unwrap_or(!existing.locked);
+        conn.execute(
+            "UPDATE todos SET locked = ? WHERE id = ?",
+            params![if next_locked { 1i64 } else { 0i64 }, id],
+        )
+        .map_err(|e| e.to_string())?;
+        existing.locked = next_locked;
+        Ok(Some(existing))
+    }
+
     pub fn delete(&self, id: &str) -> Result<(bool, Option<ResolutionSummary>), String> {
         let mut conn = self.conn.lock().unwrap();
         let existing = Self::get_conn(&conn, id);
+        if existing.as_ref().map(|c| c.locked).unwrap_or(false) {
+            return Err("🔒 Sealed by ADMIN AURA — this card cannot be deleted!".to_string());
+        }
         let changes = conn
             .execute("DELETE FROM todos WHERE id = ?", params![id])
             .map_err(|e| e.to_string())?;
@@ -745,7 +775,7 @@ impl TodoDB {
     pub fn clear_completed(&self) -> Result<i64, String> {
         let conn = self.conn.lock().unwrap();
         let changes = conn
-            .execute("DELETE FROM todos WHERE status = 'done' OR done = 1", [])
+            .execute("DELETE FROM todos WHERE (status = 'done' OR done = 1) AND locked = 0", [])
             .map_err(|e| e.to_string())?;
         Ok(changes as i64)
     }
@@ -754,7 +784,7 @@ impl TodoDB {
         let conn = self.conn.lock().unwrap();
         let changes = conn
             .execute(
-                "DELETE FROM todos WHERE (status = 'done' OR done = 1) AND created_by = ?",
+                "DELETE FROM todos WHERE (status = 'done' OR done = 1) AND created_by = ? AND locked = 0",
                 params![source],
             )
             .map_err(|e| e.to_string())?;

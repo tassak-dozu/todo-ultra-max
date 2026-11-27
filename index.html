@@ -54,6 +54,8 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html { scroll-behavior: smooth; }
+
     body {
       font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg);
@@ -1215,6 +1217,91 @@
       0% { box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.9), 0 0 34px rgba(139, 92, 246, 0.65); }
       100% { box-shadow: var(--card-shadow); }
     }
+
+    /* Admin Immortal Locked Card Aura */
+    .card.locked-aura {
+      border-color: rgba(251, 191, 36, 0.72);
+      background:
+        linear-gradient(135deg, rgba(251, 191, 36, 0.16), rgba(244, 63, 94, 0.08) 52%, rgba(251, 191, 36, 0.12)),
+        var(--card);
+      box-shadow:
+        0 0 0 1px rgba(251, 191, 36, 0.35),
+        0 0 28px rgba(251, 191, 36, 0.28),
+        0 10px 28px rgba(0, 0, 0, 0.42);
+      animation: lockedAuraPulse 2.4s ease-in-out infinite;
+    }
+
+    .card.locked-aura::before {
+      opacity: 0.75;
+      background: radial-gradient(
+        260px circle at var(--mx, 50%) var(--my, 50%),
+        rgba(251, 191, 36, 0.34),
+        rgba(244, 63, 94, 0.14) 48%,
+        transparent 76%
+      );
+    }
+
+    .card.locked-aura:hover {
+      border-color: rgba(253, 224, 71, 0.95);
+      box-shadow:
+        0 0 0 1.5px rgba(253, 224, 71, 0.6),
+        0 0 42px rgba(251, 191, 36, 0.48),
+        0 14px 36px rgba(0, 0, 0, 0.5);
+    }
+
+    .list-row.locked-aura {
+      border-left: 3px solid #fbbf24;
+      background: linear-gradient(90deg, rgba(251, 191, 36, 0.14), rgba(244, 63, 94, 0.05) 60%, transparent);
+      box-shadow: inset 0 0 18px rgba(251, 191, 36, 0.14);
+    }
+
+    .locked-aura-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.64rem;
+      font-weight: 850;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 999px;
+      color: #fef08a;
+      background: linear-gradient(135deg, rgba(251, 191, 36, 0.26), rgba(244, 63, 94, 0.22));
+      border: 1px solid rgba(251, 191, 36, 0.65);
+      box-shadow: 0 0 12px rgba(251, 191, 36, 0.35);
+    }
+
+    html[data-theme="light"] .locked-aura-badge {
+      color: #92400e;
+      background: rgba(251, 191, 36, 0.28);
+    }
+
+    @keyframes lockedAuraPulse {
+      0%, 100% {
+        box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.34), 0 0 22px rgba(251, 191, 36, 0.24), 0 10px 26px rgba(0, 0, 0, 0.36);
+      }
+      50% {
+        box-shadow: 0 0 0 1.5px rgba(253, 224, 71, 0.62), 0 0 38px rgba(251, 191, 36, 0.44), 0 10px 28px rgba(0, 0, 0, 0.42);
+      }
+    }
+
+    .aura-repel {
+      animation: auraRepel 0.44s cubic-bezier(0.36, 0.07, 0.19, 0.97) both !important;
+    }
+
+    @keyframes auraRepel {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-7px) rotate(-1.5deg); }
+      40% { transform: translateX(7px) rotate(1.5deg); }
+      60% { transform: translateX(-5px) rotate(-0.8deg); }
+      80% { transform: translateX(4px) rotate(0.8deg); }
+    }
+
+    .icon-btn.lock-btn { color: #fbbf24; }
+    .icon-btn.lock-btn:hover { background: rgba(251, 191, 36, 0.16); border-color: rgba(251, 191, 36, 0.45); color: #fef08a; }
+    .icon-btn.lock-btn.sealed { background: rgba(251, 191, 36, 0.20); border-color: rgba(251, 191, 36, 0.55); }
+    .icon-btn.warded { color: #fbbf24; opacity: 0.92; cursor: not-allowed; }
+    .icon-btn.warded:hover { background: rgba(251, 191, 36, 0.18); border-color: rgba(251, 191, 36, 0.5); color: #fef08a; }
 
     .card-top {
       position: relative;
@@ -4269,7 +4356,7 @@
     function normalizeTodo(t) {
       const status = STATUS_ORDER.includes(t.status) ? t.status : t.done ? "done" : "todo";
       const priority = ["low", "medium", "high"].includes(t.priority) ? t.priority : "medium";
-      return { ...t, status, priority, done: status === "done" };
+      return { ...t, status, priority, done: status === "done", locked: Boolean(t.locked) };
     }
 
     function relativeTime(ts) {
@@ -4432,9 +4519,21 @@
       }
     }
 
+    function repelLockedEl(el) {
+      sfx.lockedWard();
+      if (el) {
+        el.classList.remove("aura-repel");
+        void el.offsetWidth;
+        el.classList.add("aura-repel");
+        burstAtEl(el, 22);
+      }
+      showToast("👑🛡️ ADMIN AURA REPELS YOU — This card is immortal!", "web");
+    }
+
     function renderCard(todo) {
       const card = document.createElement("article");
       card.className = "card";
+      if (todo.locked) card.classList.add("locked-aura");
       if (flashCardId && flashCardId === todo.id) card.classList.add("flash");
       if (todo.id !== draggedId && draggingIds.has(todo.id)) card.classList.add("remote-drag");
       card.draggable = true;
@@ -4476,18 +4575,57 @@
       const top = document.createElement("div");
       top.className = "card-top";
 
+      const leftPills = document.createElement("div");
+      leftPills.style.cssText = "display:flex;align-items:center;gap:6px;flex-wrap:wrap";
+
       const prio = document.createElement("span");
       prio.className = `prio-pill prio-${todo.priority}`;
       prio.textContent = PRIO_LABELS[todo.priority] || todo.priority;
+      leftPills.appendChild(prio);
+
+      if (todo.locked) {
+        const auraBadge = document.createElement("span");
+        auraBadge.className = "locked-aura-badge";
+        auraBadge.textContent = "👑🔒 IMMORTAL";
+        auraBadge.title = "Sealed by Admin Aura — cannot be deleted";
+        leftPills.appendChild(auraBadge);
+      }
+
+      const rightBtns = document.createElement("div");
+      rightBtns.style.cssText = "display:inline-flex;align-items:center;gap:3px";
+
+      if (isAdmin) {
+        const lockBtn = document.createElement("button");
+        lockBtn.type = "button";
+        lockBtn.className = `icon-btn lock-btn${todo.locked ? " sealed" : ""}`;
+        lockBtn.textContent = todo.locked ? "🔓" : "🔒";
+        lockBtn.title = todo.locked ? "Admin: Unseal card" : "Admin: Seal card with Immortal Aura (un-deletable)";
+        lockBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          toggleLockTodo(todo.id, !todo.locked, card);
+        });
+        rightBtns.appendChild(lockBtn);
+      }
 
       const del = document.createElement("button");
       del.type = "button";
-      del.className = "icon-btn del";
-      del.textContent = "\u00d7";
-      del.title = "Yeet into the void";
-      del.addEventListener("click", () => deleteTodo(todo.id));
+      if (todo.locked) {
+        del.className = "icon-btn warded";
+        del.textContent = "🛡️";
+        del.title = "Sealed by Admin Aura — cannot be deleted!";
+        del.addEventListener("click", (e) => {
+          e.stopPropagation();
+          repelLockedEl(card);
+        });
+      } else {
+        del.className = "icon-btn del";
+        del.textContent = "\u00d7";
+        del.title = "Yeet into the void";
+        del.addEventListener("click", () => deleteTodo(todo.id));
+      }
+      rightBtns.appendChild(del);
 
-      top.append(prio, del);
+      top.append(leftPills, rightBtns);
 
       const textEl = document.createElement("div");
       textEl.className = "card-text";
@@ -4726,7 +4864,7 @@
 
       for (const todo of visible) {
         const li = document.createElement("li");
-        li.className = `list-row${todo.status === "done" ? " done" : ""}`;
+        li.className = `list-row${todo.status === "done" ? " done" : ""}${todo.locked ? " locked-aura" : ""}`;
 
         const cb = document.createElement("input");
         cb.type = "checkbox";
@@ -4741,7 +4879,7 @@
 
         const text = document.createElement("span");
         text.className = "list-row-text";
-        text.textContent = todo.text;
+        text.textContent = todo.locked ? `👑🔒 ${todo.text}` : todo.text;
 
         const chip = document.createElement("button");
         chip.type = "button";
@@ -4754,11 +4892,28 @@
 
         const del = document.createElement("button");
         del.type = "button";
-        del.className = "icon-btn del";
-        del.textContent = "\u00d7";
-        del.addEventListener("click", () => deleteTodo(todo.id));
+        if (todo.locked) {
+          del.className = "icon-btn warded";
+          del.textContent = "🛡️";
+          del.title = "Sealed by Admin Aura";
+          del.addEventListener("click", () => repelLockedEl(li));
+        } else {
+          del.className = "icon-btn del";
+          del.textContent = "\u00d7";
+          del.addEventListener("click", () => deleteTodo(todo.id));
+        }
 
-        li.append(cb, prio, text, chip, del);
+        if (isAdmin) {
+          const lockBtn = document.createElement("button");
+          lockBtn.type = "button";
+          lockBtn.className = `icon-btn lock-btn${todo.locked ? " sealed" : ""}`;
+          lockBtn.textContent = todo.locked ? "🔓" : "🔒";
+          lockBtn.title = todo.locked ? "Admin: Unseal card" : "Admin: Seal card with Immortal Aura";
+          lockBtn.addEventListener("click", () => toggleLockTodo(todo.id, !todo.locked, li));
+          li.append(cb, prio, text, chip, lockBtn, del);
+        } else {
+          li.append(cb, prio, text, chip, del);
+        }
         listItemsEl.appendChild(li);
       }
 
@@ -5028,7 +5183,30 @@
       }
     }
 
+    async function toggleLockTodo(id, nextLocked, el = null) {
+      try {
+        const data = await api(`/api/todos/${encodeURIComponent(id)}/lock`, {
+          method: "POST",
+          body: JSON.stringify({ locked: nextLocked }),
+        });
+        if (data.todo) {
+          todos = todos.map((t) => (t.id === id ? normalizeTodo(data.todo) : t));
+          render();
+        }
+        sfx.lockedWard();
+        if (nextLocked && el) burstAtEl(el, 24);
+        showToast(nextLocked ? "👑🔒 Card sealed with Immortal Aura!" : "👑🔓 Card unsealed", "web");
+      } catch (err) {
+        showError(`Lock toggle failed: ${err.message}`);
+      }
+    }
+
     async function deleteTodo(id) {
+      const target = todos.find((t) => t.id === id);
+      if (target && target.locked) {
+        repelLockedEl(document.querySelector(`.card[data-id="${id}"]`));
+        return;
+      }
       const prev = todos;
       todos = todos.filter((t) => t.id !== id);
       render();
@@ -5047,7 +5225,7 @@
 
     async function clearCompleted() {
       const prev = todos;
-      todos = todos.filter((t) => t.status !== "done");
+      todos = todos.filter((t) => t.status !== "done" || t.locked);
       render();
       pendingMutations++;
       try {
@@ -5135,10 +5313,12 @@
     let nukeArmTimer = null;
 
     function applyAdminAura(active) {
+      const was = isAdmin;
       isAdmin = Boolean(active);
       document.documentElement.setAttribute("data-admin", isAdmin ? "true" : "false");
       adminBtn.classList.toggle("active", isAdmin);
       adminBtn.textContent = isAdmin ? "👑 AURA ADMIN" : "👑 Admin";
+      if (was !== isAdmin) render();
     }
 
     async function checkAdminStatus() {
@@ -5514,6 +5694,12 @@
         tone(1240, "triangle", 0.05, 0.12, 0.11);
       }
 
+      function lockedWard() {
+        tone(196, "triangle", 0, 0.22, 0.14, 146.83);
+        tone(587.33, "sine", 0.02, 0.28, 0.11);
+        tone(880, "sine", 0.06, 0.34, 0.09);
+      }
+
       function scheduleReelTicks(totalMs = 3400) {
         if (!enabled) return;
         const steps = 28;
@@ -5550,7 +5736,7 @@
         }
       }
 
-      return { chipClick, betPlaced, betWon, betLost, bailout, equip, scheduleReelTicks, unbox };
+      return { chipClick, betPlaced, betWon, betLost, bailout, equip, lockedWard, scheduleReelTicks, unbox };
     })();
 
     let walletLoadedOnce = false;
@@ -6393,6 +6579,67 @@
           }
         })
         .catch(() => {});
+    })();
+
+    // =========================================================================
+    // Lenis-Style Buttery SaaS Smooth Scroll Engine
+    // =========================================================================
+    (function initSaasSmoothScroll() {
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      let targetY = window.scrollY || 0;
+      let currentY = targetY;
+      let rafId = null;
+
+      function maxScroll() {
+        return Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      }
+
+      function hasScrollableParent(el, deltaY) {
+        let cur = el;
+        while (cur && cur !== document.body && cur !== document.documentElement) {
+          const st = getComputedStyle(cur);
+          const overflowY = st.overflowY;
+          if ((overflowY === "auto" || overflowY === "scroll") && cur.scrollHeight > cur.clientHeight + 2) {
+            const atTop = cur.scrollTop <= 0;
+            const atBottom = cur.scrollTop + cur.clientHeight >= cur.scrollHeight - 1;
+            if ((deltaY < 0 && !atTop) || (deltaY > 0 && !atBottom)) return true;
+          }
+          cur = cur.parentElement;
+        }
+        return false;
+      }
+
+      function tick() {
+        const diff = targetY - currentY;
+        if (Math.abs(diff) < 0.4) {
+          currentY = targetY;
+          window.scrollTo({ top: currentY, behavior: "instant" });
+          rafId = null;
+          return;
+        }
+        currentY += diff * 0.14;
+        window.scrollTo({ top: currentY, behavior: "instant" });
+        rafId = requestAnimationFrame(tick);
+      }
+
+      window.addEventListener("wheel", (e) => {
+        if (e.ctrlKey || e.defaultPrevented) return;
+        if (document.querySelector(".modal-backdrop.open")) return;
+        if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+        const dy = e.deltaMode === 1 ? e.deltaY * 36 : e.deltaMode === 2 ? e.deltaY * window.innerHeight : e.deltaY;
+        if (hasScrollableParent(e.target, dy)) return;
+        e.preventDefault();
+        if (!rafId) currentY = window.scrollY || 0;
+        targetY = Math.max(0, Math.min(maxScroll(), (rafId ? targetY : currentY) + dy * 1.05));
+        if (!rafId) rafId = requestAnimationFrame(tick);
+      }, { passive: false });
+
+      window.addEventListener("scroll", () => {
+        if (!rafId) {
+          currentY = window.scrollY || 0;
+          targetY = currentY;
+        }
+      }, { passive: true });
     })();
 
     // =========================================================================

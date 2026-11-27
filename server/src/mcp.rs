@@ -301,6 +301,15 @@ where
                             Some(rpc_result(id, tool_failure(&format!("Todo not found: {card_id}")))),
                         );
                     };
+                    if existing.locked {
+                        return (
+                            200,
+                            Some(rpc_result(
+                                id,
+                                tool_failure("🔒 Sealed by ADMIN AURA — this card is immortal and cannot be deleted!"),
+                            )),
+                        );
+                    }
                     if existing.created_by != "mcp" {
                         return (
                             200,
