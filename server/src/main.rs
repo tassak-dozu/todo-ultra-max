@@ -726,6 +726,20 @@ async fn create_todo(
         );
     }
 
+    let Some(text) = body.text.as_deref() else {
+        return json_resp(StatusCode::BAD_REQUEST, json!({ "error": "Task text is required" }));
+    };
+
+    if let Err(msg) = st.db.check_duplicate(text) {
+        if msg.starts_with("DUPLICATE:") {
+            return json_resp(
+                StatusCode::TOO_MANY_REQUESTS,
+                json!({ "error": msg, "code": "duplicate" }),
+            );
+        }
+        return json_resp(StatusCode::BAD_REQUEST, json!({ "error": msg }));
+    }
+
     // Adaptive Cloudflare Turnstile on adding tasks (bypassed when Admin or authenticated via API key)
     if !st.is_admin(&headers, None) && !st.has_valid_api_key_header(&headers) {
         let cap_tok = headers.get("x-captcha-token").and_then(|v| v.to_str().ok());
@@ -741,10 +755,6 @@ async fn create_todo(
             }
         }
     }
-
-    let Some(text) = body.text.as_deref() else {
-        return json_resp(StatusCode::BAD_REQUEST, json!({ "error": "Task text is required" }));
-    };
 
     match st.db.add(text, body.status.as_deref(), body.priority.as_deref()) {
         Ok(todo) => {

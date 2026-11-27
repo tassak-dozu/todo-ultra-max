@@ -561,6 +561,18 @@ impl TodoDB {
         .flatten()
     }
 
+    pub fn check_duplicate(&self, raw_text: &str) -> Result<(), String> {
+        let text = raw_text.trim();
+        if text.is_empty() {
+            return Err("Task text is required".to_string());
+        }
+        if text.chars().count() > MAX_TEXT_LENGTH {
+            return Err(format!("Task text must be <= {MAX_TEXT_LENGTH} characters"));
+        }
+        let conn = self.conn.lock().unwrap();
+        Self::check_duplicate_conn(&conn, text, None)
+    }
+
     pub fn add(
         &self,
         raw_text: &str,
