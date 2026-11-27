@@ -23,7 +23,7 @@
 - ✨ **Powered by AI™ Everywhere** — Iridescent AI aura badges, Agent Kevin's Live Support™ garbage-English engine, and native MCP robot control.
 - 🗂️ **Kanban + List Views** — Drag-and-drop across **Procrastinating (`To Do`)**, **Actually Cooking (`In Progress`)**, and **Certified Done (`Done`)** with priority glow pills and double-click inline editing.
 - 🎰 **Card Completion Prediction Gambling** — Start with `1,000 🪙` Aura Coins and bet on when any open card finishes (`⚡ < 5 min`, `🔥 5m – 1h`, `🐢 1h – 24h`, `💀 24h+ / Nuked`) with live parimutuel odds, auto-settlement, emergency bailouts, global leaderboard, and MCP `place_bet` / `get_leaderboard` tools.
-- 🛡️ **Adaptive Cloudflare Turnstile** — Never nags on normal usage; on rapid add/delete bursts, verifies real humans silently via **Cloudflare Turnstile** (`interaction-only` + server-side `siteverify`), popping a glowing Turnstile shield only when Cloudflare requests interaction, then unlocks 10 frictionless moves for 5 minutes.
+- 🛡️ **Cloudflare Turnstile Gate** — Zero free unverified adds/deletes: any unverified IP must pass **Cloudflare Turnstile** (`interaction-only` — silent for trusted IPs/browsers, interactive only when Cloudflare flags risk) verified via server-side `siteverify`, unlocking 5 smooth moves for 5 minutes.
 - 📡 **Live Telemetry & Presence** — Real-time WebSocket RTT (`ms`), signal bars, stacked online viewer orbs, typing indicator, remote-drag neon glow, and live board gossip feed.
 - 🔐 **API Key Gatekeeper** — Optional `API_KEY` protection (`writes` or `all` mode) with constant-time SHA-256 verification and an in-app **🔑 VIP Pass** modal.
 
@@ -35,7 +35,7 @@
 | --- | --- |
 | `GET /api/health` | 💓 Health check, Rust engine telemetry, auth mode, online count & MCP calls |
 | `GET /api/auth/verify` | 🔑 Verify an API key (`Authorization: Bearer` / `X-API-Key` / `?api_key=`) |
-| `POST /api/captcha/verify` | ✅ Verify Cloudflare Turnstile token via `siteverify` & unlock 10 moves |
+| `POST /api/captcha/verify` | ✅ Verify Cloudflare Turnstile token via `siteverify` & unlock 5 moves |
 | `GET /api/todos` | 📋 Fetch all shared cards, open betting markets, leaderboard & activity |
 | `POST /api/todos` | ➕ Spawn a card (`{ "text", "status"?, "priority"? }`) |
 | `PATCH /api/todos/:id` | 🚚 Move column (moving to `done` settles bets!), edit priority/text |

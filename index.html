@@ -1686,7 +1686,7 @@
         <h2 id="captcha-title">🛡️ Cloudflare Aura Check</h2>
         <button type="button" class="icon-btn" id="captcha-close">&times;</button>
       </div>
-      <p class="turnstile-desc">Slow down speedrunner — quick Cloudflare verification unlocks 10 smooth moves.</p>
+      <p class="turnstile-desc">Quick Cloudflare verification unlocks 5 smooth moves.</p>
       <div class="turnstile-wrap" id="turnstile-container"></div>
       <div class="key-feedback" id="captcha-feedback"></div>
     </div>
@@ -2950,7 +2950,7 @@
               const data = await res.json().catch(() => ({}));
               if (res.ok && data.captchaToken) {
                 resetTurnstileHost();
-                showToast(`🛡️ Cloudflare verified! ${data.credits || 10} smooth moves unlocked`, "web");
+                showToast(`🛡️ Cloudflare verified! ${data.credits || 5} smooth moves unlocked`, "web");
                 const resFn = captchaResolver;
                 captchaResolver = null;
                 captchaRejecter = null;
