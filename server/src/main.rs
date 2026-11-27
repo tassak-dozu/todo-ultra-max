@@ -26,7 +26,7 @@ use std::{
     },
 };
 use subtle::ConstantTimeEq;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
@@ -54,6 +54,8 @@ struct ActivityEvent {
 #[serde(rename_all = "camelCase")]
 struct PeerState {
     id: String,
+    #[serde(skip_serializing)]
+    player_id: Option<String>,
     color: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<String>,
@@ -63,9 +65,37 @@ struct PeerState {
     title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     cursor_aura: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    clown_until: Option<i64>,
     typing: bool,
     dragging_id: Option<String>,
     is_admin: bool,
+}
+
+#[derive(Debug, Clone)]
+struct DuelOffer {
+    id: String,
+    from_peer: String,
+    to_peer: String,
+    wager: i64,
+}
+
+#[derive(Debug, Clone)]
+struct TradeSide {
+    peer_id: String,
+    player_id: String,
+    items: Vec<String>,
+    coins: i64,
+    ready: bool,
+    confirmed: bool,
+}
+
+#[derive(Debug, Clone)]
+struct TradeSession {
+    id: String,
+    status: String,
+    a: TradeSide,
+    b: TradeSide,
 }
 
 struct AppState {
@@ -73,6 +103,9 @@ struct AppState {
     captcha: TurnstileGate,
     tx: broadcast::Sender<String>,
     peers: Mutex<HashMap<String, PeerState>>,
+    peers_tx: Mutex<HashMap<String, mpsc::UnboundedSender<String>>>,
+    duels: Mutex<HashMap<String, DuelOffer>>,
+    trades: Mutex<HashMap<String, TradeSession>>,
     activity: Mutex<VecDeque<ActivityEvent>>,
     rate_buckets: Mutex<HashMap<String, (u32, i64)>>,
     mcp_write_min_buckets: Mutex<HashMap<String, (u32, i64)>>,
@@ -353,6 +386,110 @@ impl AppState {
         });
         let _ = self.tx.send(payload.to_string());
     }
+
+    fn send_to_peer(&self, peer_id: &str, payload: &Value) {
+        if let Some(tx) = self.peers_tx.lock().unwrap().get(peer_id).cloned() {
+            let _ = tx.send(payload.to_string());
+        }
+    }
+
+    fn peer_identity(&self, peer_id: &str) -> Option<(String, String)> {
+        let peers = self.peers.lock().unwrap();
+        let p = peers.get(peer_id)?;
+        let pid = p.player_id.clone()?;
+        let name = p
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("User#{}", &peer_id[..4.min(peer_id.len())]));
+        Some((pid, name))
+    }
+
+    fn push_trade_state(&self, trade: &TradeSession) {
+        let inv_a = self.db.get_tradeable_inventory(&trade.a.player_id);
+        let inv_b = self.db.get_tradeable_inventory(&trade.b.player_id);
+        let name_a = self
+            .peer_identity(&trade.a.peer_id)
+            .map(|x| x.1)
+            .unwrap_or_else(|| "Player A".to_string());
+        let name_b = self
+            .peer_identity(&trade.b.peer_id)
+            .map(|x| x.1)
+            .unwrap_or_else(|| "Player B".to_string());
+        let wal_a = self
+            .db
+            .get_wallet_state(&trade.a.player_id, Some(&name_a))
+            .map(|(w, _)| w.balance)
+            .unwrap_or(0);
+        let wal_b = self
+            .db
+            .get_wallet_state(&trade.b.player_id, Some(&name_b))
+            .map(|(w, _)| w.balance)
+            .unwrap_or(0);
+
+        let offered_a: Vec<_> = inv_a
+            .iter()
+            .filter(|i| trade.a.items.contains(&i.id))
+            .cloned()
+            .collect();
+        let offered_b: Vec<_> = inv_b
+            .iter()
+            .filter(|i| trade.b.items.contains(&i.id))
+            .cloned()
+            .collect();
+
+        let msg_for_a = json!({
+            "type": "trade_state",
+            "tradeId": trade.id,
+            "status": trade.status,
+            "you": {
+                "peerId": trade.a.peer_id,
+                "name": name_a,
+                "balance": wal_a,
+                "inventory": inv_a,
+                "offeredIds": trade.a.items,
+                "offeredItems": offered_a,
+                "coins": trade.a.coins,
+                "ready": trade.a.ready,
+                "confirmed": trade.a.confirmed,
+            },
+            "partner": {
+                "peerId": trade.b.peer_id,
+                "name": name_b,
+                "balance": wal_b,
+                "offeredItems": offered_b,
+                "coins": trade.b.coins,
+                "ready": trade.b.ready,
+                "confirmed": trade.b.confirmed,
+            }
+        });
+        let msg_for_b = json!({
+            "type": "trade_state",
+            "tradeId": trade.id,
+            "status": trade.status,
+            "you": {
+                "peerId": trade.b.peer_id,
+                "name": name_b,
+                "balance": wal_b,
+                "inventory": inv_b,
+                "offeredIds": trade.b.items,
+                "offeredItems": offered_b,
+                "coins": trade.b.coins,
+                "ready": trade.b.ready,
+                "confirmed": trade.b.confirmed,
+            },
+            "partner": {
+                "peerId": trade.a.peer_id,
+                "name": name_a,
+                "balance": wal_a,
+                "offeredItems": offered_a,
+                "coins": trade.a.coins,
+                "ready": trade.a.ready,
+                "confirmed": trade.a.confirmed,
+            }
+        });
+        self.send_to_peer(&trade.a.peer_id, &msg_for_a);
+        self.send_to_peer(&trade.b.peer_id, &msg_for_b);
+    }
 }
 
 fn json_resp(status: StatusCode, body: Value) -> Response {
@@ -379,6 +516,7 @@ struct KeyQuery {
     cursor_skin: Option<String>,
     title: Option<String>,
     cursor_aura: Option<String>,
+    player_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -1442,8 +1580,22 @@ async fn ws_handler(
         .as_deref()
         .map(|s| s.trim().chars().take(20).collect())
         .filter(|s: &String| !s.is_empty());
+    let initial_player_id: Option<String> = q
+        .player_id
+        .as_deref()
+        .map(|s| s.trim().chars().take(64).collect())
+        .filter(|s: &String| !s.is_empty());
     ws.on_upgrade(move |socket| {
-        handle_socket(socket, st, is_admin, initial_name, initial_skin, initial_title, initial_aura)
+        handle_socket(
+            socket,
+            st,
+            is_admin,
+            initial_name,
+            initial_skin,
+            initial_title,
+            initial_aura,
+            initial_player_id,
+        )
     })
 }
 
@@ -1455,6 +1607,7 @@ async fn handle_socket(
     initial_skin: Option<String>,
     initial_title: Option<String>,
     initial_aura: Option<String>,
+    initial_player_id: Option<String>,
 ) {
     let peer_id = Uuid::new_v4().to_string()[..8].to_string();
     let color = {
@@ -1468,11 +1621,13 @@ async fn handle_socket(
             peer_id.clone(),
             PeerState {
                 id: peer_id.clone(),
+                player_id: initial_player_id,
                 color: color.clone(),
                 name: initial_name,
                 cursor_skin: initial_skin,
                 title: initial_title,
                 cursor_aura: initial_aura,
+                clown_until: None,
                 typing: false,
                 dragging_id: None,
                 is_admin,
@@ -1498,7 +1653,11 @@ async fn handle_socket(
 
     st.broadcast_sync(None, None);
 
-    let (direct_tx, mut direct_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let (direct_tx, mut direct_rx) = mpsc::unbounded_channel::<String>();
+    st.peers_tx
+        .lock()
+        .unwrap()
+        .insert(peer_id.clone(), direct_tx.clone());
 
     let mut send_task = tokio::spawn(async move {
         loop {
@@ -1631,12 +1790,15 @@ async fn handle_socket(
                                         .and_then(|v| v.as_str())
                                         .map(|n| n.trim().chars().take(24).collect())
                                         .filter(|n: &String| !n.is_empty());
-                                    let (stored_name, stored_skin, stored_title, stored_aura) = {
+                                    let (stored_name, stored_skin, stored_title, stored_aura, stored_clown) = {
                                         let peers = st_recv.peers.lock().unwrap();
                                         peers
                                             .get(&pid_recv)
-                                            .map(|p| (p.name.clone(), p.cursor_skin.clone(), p.title.clone(), p.cursor_aura.clone()))
-                                            .unwrap_or((None, None, None, None))
+                                            .map(|p| {
+                                                let clown = p.clown_until.filter(|t| *t > now_ms());
+                                                (p.name.clone(), p.cursor_skin.clone(), p.title.clone(), p.cursor_aura.clone(), clown)
+                                            })
+                                            .unwrap_or((None, None, None, None, None))
                                     };
                                     let name = incoming_name.or(stored_name);
                                     let payload = json!({
@@ -1648,12 +1810,396 @@ async fn handle_socket(
                                         "cursorSkin": stored_skin,
                                         "title": stored_title,
                                         "cursorAura": stored_aura,
+                                        "clownUntil": stored_clown,
                                         "x": x,
                                         "y": y,
                                         "down": down
                                     });
                                     let _ = st_recv.tx.send(payload.to_string());
                                 }
+                            }
+                        }
+                        Some("duel_challenge") => {
+                            let target_peer = val.get("targetPeerId").and_then(|v| v.as_str()).unwrap_or("").trim();
+                            let wager = val.get("wager").and_then(|v| v.as_i64()).unwrap_or(0);
+                            if target_peer.is_empty() || target_peer == pid_recv {
+                                continue;
+                            }
+                            if !(10..=100_000).contains(&wager) {
+                                let _ = direct_tx.send(json!({ "type": "pvp_error", "error": "Duel wager must be 10..100,000 🪙" }).to_string());
+                                continue;
+                            }
+                            let Some((from_pid, from_name)) = st_recv.peer_identity(&pid_recv) else {
+                                let _ = direct_tx.send(json!({ "type": "pvp_error", "error": "Reconnect to duel (missing playerId)" }).to_string());
+                                continue;
+                            };
+                            let Some((to_pid, to_name)) = st_recv.peer_identity(target_peer) else {
+                                let _ = direct_tx.send(json!({ "type": "pvp_error", "error": "That player went offline!" }).to_string());
+                                continue;
+                            };
+                            let from_bal = st_recv.db.get_wallet_state(&from_pid, Some(&from_name)).map(|x| x.0.balance).unwrap_or(0);
+                            let to_bal = st_recv.db.get_wallet_state(&to_pid, Some(&to_name)).map(|x| x.0.balance).unwrap_or(0);
+                            if from_bal < wager {
+                                let _ = direct_tx.send(json!({ "type": "pvp_error", "error": format!("Need {wager} 🪙 to challenge (you have {from_bal} 🪙)") }).to_string());
+                                continue;
+                            }
+                            if to_bal < wager {
+                                let _ = direct_tx.send(json!({ "type": "pvp_error", "error": format!("{to_name} only has {to_bal} 🪙!") }).to_string());
+                                continue;
+                            }
+                            let duel_id = Uuid::new_v4().to_string()[..12].to_string();
+                            st_recv.duels.lock().unwrap().insert(
+                                duel_id.clone(),
+                                DuelOffer {
+                                    id: duel_id.clone(),
+                                    from_peer: pid_recv.clone(),
+                                    to_peer: target_peer.to_string(),
+                                    wager,
+                                },
+                            );
+                            st_recv.send_to_peer(
+                                target_peer,
+                                &json!({
+                                    "type": "duel_incoming",
+                                    "duelId": duel_id,
+                                    "fromPeerId": pid_recv,
+                                    "fromName": from_name,
+                                    "wager": wager
+                                }),
+                            );
+                            let _ = direct_tx.send(
+                                json!({
+                                    "type": "duel_sent",
+                                    "duelId": duel_id,
+                                    "toName": to_name,
+                                    "wager": wager
+                                })
+                                .to_string(),
+                            );
+                        }
+                        Some("duel_respond") => {
+                            let duel_id = val.get("duelId").and_then(|v| v.as_str()).unwrap_or("");
+                            let accept = val.get("accept").and_then(|v| v.as_bool()).unwrap_or(false);
+                            let Some(offer) = st_recv.duels.lock().unwrap().remove(duel_id) else {
+                                let _ = direct_tx.send(json!({ "type": "pvp_error", "error": "Duel offer expired or already settled!" }).to_string());
+                                continue;
+                            };
+                            if offer.to_peer != pid_recv {
+                                continue;
+                            }
+                            if !accept {
+                                let to_name = st_recv.peer_identity(&pid_recv).map(|x| x.1).unwrap_or_else(|| "Opponent".to_string());
+                                st_recv.send_to_peer(
+                                    &offer.from_peer,
+                                    &json!({ "type": "pvp_error", "error": format!("🐔 {to_name} chickened out of your {wager} 🪙 duel!", wager = offer.wager) }),
+                                );
+                                continue;
+                            }
+                            let (Some((p1_id, p1_name)), Some((p2_id, p2_name))) =
+                                (st_recv.peer_identity(&offer.from_peer), st_recv.peer_identity(&offer.to_peer))
+                            else {
+                                continue;
+                            };
+                            match st_recv.db.resolve_coin_duel(&p1_id, Some(&p1_name), &p2_id, Some(&p2_name), offer.wager) {
+                                Ok((p1_won, w1, w2)) => {
+                                    let (winner_peer, loser_peer, winner_name, loser_name, winner_wallet, loser_wallet) = if p1_won {
+                                        (offer.from_peer.clone(), offer.to_peer.clone(), w1.name.clone(), w2.name.clone(), w1, w2)
+                                    } else {
+                                        (offer.to_peer.clone(), offer.from_peer.clone(), w2.name.clone(), w1.name.clone(), w2, w1)
+                                    };
+                                    let clown_until = now_ms() + 45_000;
+                                    {
+                                        let mut peers = st_recv.peers.lock().unwrap();
+                                        if let Some(lp) = peers.get_mut(&loser_peer) {
+                                            lp.clown_until = Some(clown_until);
+                                        }
+                                        if let Some(wp) = peers.get_mut(&winner_peer) {
+                                            wp.clown_until = None;
+                                        }
+                                    }
+                                    let ev = st_recv.record_activity(
+                                        "bet",
+                                        "web",
+                                        format!("⚔️ COIN DUEL: {winner_name} SLEW {loser_name} for {} 🪙! ({loser_name} is now 🤡 SHAMED)", offer.wager),
+                                        None,
+                                    );
+                                    st_recv.send_to_peer(
+                                        &winner_peer,
+                                        &json!({
+                                            "type": "duel_result",
+                                            "won": true,
+                                            "wager": offer.wager,
+                                            "winnerName": winner_name,
+                                            "loserName": loser_name,
+                                            "wallet": winner_wallet,
+                                        }),
+                                    );
+                                    st_recv.send_to_peer(
+                                        &loser_peer,
+                                        &json!({
+                                            "type": "duel_result",
+                                            "won": false,
+                                            "wager": offer.wager,
+                                            "winnerName": winner_name,
+                                            "loserName": loser_name,
+                                            "wallet": loser_wallet,
+                                            "clownUntil": clown_until,
+                                        }),
+                                    );
+                                    st_recv.broadcast_sync(Some(&ev), None);
+                                }
+                                Err(err) => {
+                                    let err_json = json!({ "type": "pvp_error", "error": err });
+                                    st_recv.send_to_peer(&offer.from_peer, &err_json);
+                                    st_recv.send_to_peer(&offer.to_peer, &err_json);
+                                }
+                            }
+                        }
+                        Some("trade_invite") => {
+                            let target_peer = val.get("targetPeerId").and_then(|v| v.as_str()).unwrap_or("").trim();
+                            if target_peer.is_empty() || target_peer == pid_recv {
+                                continue;
+                            }
+                            let Some((a_pid, from_name)) = st_recv.peer_identity(&pid_recv) else {
+                                continue;
+                            };
+                            let Some((b_pid, to_name)) = st_recv.peer_identity(target_peer) else {
+                                let _ = direct_tx.send(json!({ "type": "pvp_error", "error": "That player went offline!" }).to_string());
+                                continue;
+                            };
+                            if a_pid == b_pid {
+                                let _ = direct_tx.send(json!({ "type": "pvp_error", "error": "You can't trade with your own second tab!" }).to_string());
+                                continue;
+                            }
+                            let trade_id = Uuid::new_v4().to_string()[..12].to_string();
+                            let session = TradeSession {
+                                id: trade_id.clone(),
+                                status: "pending".to_string(),
+                                a: TradeSide { peer_id: pid_recv.clone(), player_id: a_pid, items: Vec::new(), coins: 0, ready: false, confirmed: false },
+                                b: TradeSide { peer_id: target_peer.to_string(), player_id: b_pid, items: Vec::new(), coins: 0, ready: false, confirmed: false },
+                            };
+                            st_recv.trades.lock().unwrap().insert(trade_id.clone(), session);
+                            st_recv.send_to_peer(
+                                target_peer,
+                                &json!({
+                                    "type": "trade_incoming",
+                                    "tradeId": trade_id,
+                                    "fromPeerId": pid_recv,
+                                    "fromName": from_name
+                                }),
+                            );
+                            let _ = direct_tx.send(
+                                json!({
+                                    "type": "trade_sent",
+                                    "tradeId": trade_id,
+                                    "toName": to_name
+                                })
+                                .to_string(),
+                            );
+                        }
+                        Some("trade_accept") => {
+                            let trade_id = val.get("tradeId").and_then(|v| v.as_str()).unwrap_or("");
+                            let accept = val.get("accept").and_then(|v| v.as_bool()).unwrap_or(false);
+                            if !accept {
+                                if let Some(t) = st_recv.trades.lock().unwrap().remove(trade_id) {
+                                    let decliner = st_recv.peer_identity(&pid_recv).map(|x| x.1).unwrap_or_else(|| "User".to_string());
+                                    let msg = json!({ "type": "trade_closed", "tradeId": trade_id, "reason": format!("{decliner} declined the trade offer") });
+                                    st_recv.send_to_peer(&t.a.peer_id, &msg);
+                                    st_recv.send_to_peer(&t.b.peer_id, &msg);
+                                }
+                                continue;
+                            }
+                            let active_copy = {
+                                let mut trades = st_recv.trades.lock().unwrap();
+                                if let Some(t) = trades.get_mut(trade_id) {
+                                    if t.b.peer_id == pid_recv && t.status == "pending" {
+                                        t.status = "active".to_string();
+                                        Some(t.clone())
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
+                            };
+                            if let Some(t) = active_copy {
+                                st_recv.push_trade_state(&t);
+                            }
+                        }
+                        Some("trade_update") => {
+                            let trade_id = val.get("tradeId").and_then(|v| v.as_str()).unwrap_or("");
+                            let items: Vec<String> = val
+                                .get("items")
+                                .and_then(|v| v.as_array())
+                                .map(|arr| arr.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).take(40).collect())
+                                .unwrap_or_default();
+                            let coins = val.get("coins").and_then(|v| v.as_i64()).unwrap_or(0).clamp(0, 10_000_000);
+                            let updated = {
+                                let mut trades = st_recv.trades.lock().unwrap();
+                                if let Some(t) = trades.get_mut(trade_id) {
+                                    if t.status != "active" {
+                                        None
+                                    } else {
+                                        let is_a = t.a.peer_id == pid_recv;
+                                        let is_b = t.b.peer_id == pid_recv;
+                                        if is_a || is_b {
+                                            if is_a {
+                                                t.a.items = items;
+                                                t.a.coins = coins;
+                                            } else {
+                                                t.b.items = items;
+                                                t.b.coins = coins;
+                                            }
+                                            // CS:GO anti-scam lock reset whenever offer changes
+                                            t.a.ready = false;
+                                            t.a.confirmed = false;
+                                            t.b.ready = false;
+                                            t.b.confirmed = false;
+                                            Some(t.clone())
+                                        } else {
+                                            None
+                                        }
+                                    }
+                                } else {
+                                    None
+                                }
+                            };
+                            if let Some(t) = updated {
+                                st_recv.push_trade_state(&t);
+                            }
+                        }
+                        Some("trade_ready") => {
+                            let trade_id = val.get("tradeId").and_then(|v| v.as_str()).unwrap_or("");
+                            let ready = val.get("ready").and_then(|v| v.as_bool()).unwrap_or(true);
+                            let updated = {
+                                let mut trades = st_recv.trades.lock().unwrap();
+                                if let Some(t) = trades.get_mut(trade_id) {
+                                    if t.status != "active" {
+                                        None
+                                    } else if t.a.peer_id == pid_recv {
+                                        t.a.ready = ready;
+                                        if !ready {
+                                            t.a.confirmed = false;
+                                            t.b.confirmed = false;
+                                        }
+                                        Some(t.clone())
+                                    } else if t.b.peer_id == pid_recv {
+                                        t.b.ready = ready;
+                                        if !ready {
+                                            t.a.confirmed = false;
+                                            t.b.confirmed = false;
+                                        }
+                                        Some(t.clone())
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
+                            };
+                            if let Some(t) = updated {
+                                st_recv.push_trade_state(&t);
+                            }
+                        }
+                        Some("trade_confirm") => {
+                            let trade_id = val.get("tradeId").and_then(|v| v.as_str()).unwrap_or("");
+                            let (maybe_done, maybe_push) = {
+                                let mut trades = st_recv.trades.lock().unwrap();
+                                let mut done_session: Option<TradeSession> = None;
+                                let mut push_session: Option<TradeSession> = None;
+                                if let Some(t) = trades.get_mut(trade_id) {
+                                    if t.status == "active" && t.a.ready && t.b.ready {
+                                        if t.a.peer_id == pid_recv {
+                                            t.a.confirmed = true;
+                                        } else if t.b.peer_id == pid_recv {
+                                            t.b.confirmed = true;
+                                        }
+                                        if t.a.confirmed && t.b.confirmed {
+                                            done_session = trades.remove(trade_id);
+                                        } else {
+                                            push_session = Some(t.clone());
+                                        }
+                                    }
+                                }
+                                (done_session, push_session)
+                            };
+                            if let Some(t) = maybe_push {
+                                st_recv.push_trade_state(&t);
+                            } else if let Some(t) = maybe_done {
+                                let name_a = st_recv.peer_identity(&t.a.peer_id).map(|x| x.1);
+                                let name_b = st_recv.peer_identity(&t.b.peer_id).map(|x| x.1);
+                                match st_recv.db.execute_trade(
+                                    &t.a.player_id,
+                                    name_a.as_deref(),
+                                    &t.a.items,
+                                    t.a.coins,
+                                    &t.b.player_id,
+                                    name_b.as_deref(),
+                                    &t.b.items,
+                                    t.b.coins,
+                                ) {
+                                    Ok((w1, w2, inv1, inv2, l1, l2, summary)) => {
+                                        {
+                                            let mut peers = st_recv.peers.lock().unwrap();
+                                            if let Some(pa) = peers.get_mut(&t.a.peer_id) {
+                                                pa.cursor_skin = l1.cursor_skin.clone();
+                                                pa.title = l1.title.clone();
+                                                pa.cursor_aura = l1.aura.clone();
+                                            }
+                                            if let Some(pb) = peers.get_mut(&t.b.peer_id) {
+                                                pb.cursor_skin = l2.cursor_skin.clone();
+                                                pb.title = l2.title.clone();
+                                                pb.cursor_aura = l2.aura.clone();
+                                            }
+                                        }
+                                        let ev = st_recv.record_activity("bet", "web", summary.clone(), None);
+                                        st_recv.send_to_peer(
+                                            &t.a.peer_id,
+                                            &json!({
+                                                "type": "trade_complete",
+                                                "tradeId": t.id,
+                                                "summary": summary,
+                                                "wallet": w1,
+                                                "inventory": inv1,
+                                                "loadout": l1,
+                                            }),
+                                        );
+                                        st_recv.send_to_peer(
+                                            &t.b.peer_id,
+                                            &json!({
+                                                "type": "trade_complete",
+                                                "tradeId": t.id,
+                                                "summary": summary,
+                                                "wallet": w2,
+                                                "inventory": inv2,
+                                                "loadout": l2,
+                                            }),
+                                        );
+                                        st_recv.broadcast_sync(Some(&ev), None);
+                                    }
+                                    Err(err) => {
+                                        let closed = json!({ "type": "trade_closed", "tradeId": t.id, "reason": err });
+                                        st_recv.send_to_peer(&t.a.peer_id, &closed);
+                                        st_recv.send_to_peer(&t.b.peer_id, &closed);
+                                    }
+                                }
+                            }
+                        }
+                        Some("trade_cancel") => {
+                            let trade_id = val.get("tradeId").and_then(|v| v.as_str()).unwrap_or("");
+                            let removed = {
+                                let mut trades = st_recv.trades.lock().unwrap();
+                                let owns = trades
+                                    .get(trade_id)
+                                    .map(|t| t.a.peer_id == pid_recv || t.b.peer_id == pid_recv)
+                                    .unwrap_or(false);
+                                if owns { trades.remove(trade_id) } else { None }
+                            };
+                            if let Some(t) = removed {
+                                let who = st_recv.peer_identity(&pid_recv).map(|x| x.1).unwrap_or_else(|| "User".to_string());
+                                let closed = json!({ "type": "trade_closed", "tradeId": trade_id, "reason": format!("{who} cancelled the trade") });
+                                st_recv.send_to_peer(&t.a.peer_id, &closed);
+                                st_recv.send_to_peer(&t.b.peer_id, &closed);
                             }
                         }
                         Some("typing") => {
@@ -1695,6 +2241,27 @@ async fn handle_socket(
     }
 
     st.peers.lock().unwrap().remove(&peer_id);
+    st.peers_tx.lock().unwrap().remove(&peer_id);
+    st.duels
+        .lock()
+        .unwrap()
+        .retain(|_, d| d.from_peer != peer_id && d.to_peer != peer_id);
+    let dropped_trades: Vec<TradeSession> = {
+        let mut trades = st.trades.lock().unwrap();
+        let keys: Vec<String> = trades
+            .iter()
+            .filter(|(_, t)| t.a.peer_id == peer_id || t.b.peer_id == peer_id)
+            .map(|(k, _)| k.clone())
+            .collect();
+        keys.into_iter().filter_map(|k| trades.remove(&k)).collect()
+    };
+    for t in dropped_trades {
+        let partner = if t.a.peer_id == peer_id { &t.b.peer_id } else { &t.a.peer_id };
+        st.send_to_peer(
+            partner,
+            &json!({ "type": "trade_closed", "tradeId": t.id, "reason": "Trade partner disconnected" }),
+        );
+    }
     st.broadcast_presence();
 }
 
@@ -1746,6 +2313,9 @@ async fn main() {
         captcha: TurnstileGate::new(turnstile_site_key, turnstile_secret_key),
         tx,
         peers: Mutex::new(HashMap::new()),
+        peers_tx: Mutex::new(HashMap::new()),
+        duels: Mutex::new(HashMap::new()),
+        trades: Mutex::new(HashMap::new()),
         activity: Mutex::new(VecDeque::new()),
         rate_buckets: Mutex::new(HashMap::new()),
         mcp_write_min_buckets: Mutex::new(HashMap::new()),

@@ -3422,6 +3422,182 @@
     .loot-tile-icon { font-size: 1.5rem; line-height: 1; }
     .loot-tile-name { font-size: 0.64rem; font-weight: 750; line-height: 1.2; color: #f8fafc; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
+    /* Right-Click Remote Cursor Menu + 1v1 Coinduel + CS:GO Trade UI */
+    #cursor-ctx-menu {
+      position: fixed;
+      z-index: 95;
+      min-width: 238px;
+      padding: 10px;
+      border-radius: 15px;
+      background: rgba(12, 16, 30, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      backdrop-filter: blur(24px) saturate(1.4);
+      box-shadow: 0 20px 54px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      display: none;
+      flex-direction: column;
+      gap: 7px;
+      animation: modalPop 0.14s ease both;
+    }
+
+    #cursor-ctx-menu.open { display: flex; }
+
+    html[data-theme="light"] #cursor-ctx-menu {
+      background: rgba(255, 255, 255, 0.95);
+      border-color: rgba(15, 23, 42, 0.16);
+    }
+
+    .ctx-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.78rem;
+      font-weight: 850;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .ctx-wager-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 5px;
+    }
+
+    .ctx-wager-btn {
+      padding: 5px 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border-strong);
+      background: var(--input-bg);
+      color: #fbbf24;
+      font-size: 0.68rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.1s ease, border-color 0.15s ease;
+    }
+
+    .ctx-wager-btn:hover { transform: translateY(-1px); border-color: #fbbf24; }
+
+    .ctx-action-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(34, 211, 238, 0.35);
+      background: rgba(34, 211, 238, 0.10);
+      color: var(--text);
+      font-size: 0.78rem;
+      font-weight: 750;
+      cursor: pointer;
+      transition: transform 0.1s ease, background 0.15s ease;
+    }
+
+    .ctx-action-btn:hover { background: rgba(34, 211, 238, 0.22); transform: translateY(-1px); }
+
+    .remote-cursor.is-clowned .remote-cursor-tag {
+      background: #fb7185 !important;
+      color: #fff !important;
+      box-shadow: 0 0 18px rgba(244, 63, 94, 0.8);
+    }
+
+    .duel-coin-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 10px;
+      gap: 10px;
+    }
+
+    .duel-coin-disc {
+      font-size: 3.1rem;
+      line-height: 1;
+      filter: drop-shadow(0 0 22px rgba(251, 191, 36, 0.7));
+    }
+
+    .duel-coin-disc.spinning {
+      animation: coinFlipSpin 0.55s linear infinite;
+    }
+
+    @keyframes coinFlipSpin {
+      0% { transform: rotateY(0deg) scale(1); }
+      50% { transform: rotateY(180deg) scale(1.18); }
+      100% { transform: rotateY(360deg) scale(1); }
+    }
+
+    .trade-panes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    @media (max-width: 720px) {
+      .trade-panes { grid-template-columns: 1fr; }
+    }
+
+    .trade-pane {
+      padding: 10px;
+      border-radius: 14px;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .trade-pane.is-ready {
+      border-color: rgba(16, 185, 129, 0.75);
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+    }
+
+    .trade-pane-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      font-weight: 800;
+      gap: 6px;
+    }
+
+    .trade-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+      gap: 6px;
+      min-height: 92px;
+      max-height: 168px;
+      overflow-y: auto;
+      padding: 4px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.18);
+    }
+
+    .trade-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 3px;
+      padding: 7px 5px;
+      border-radius: 10px;
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-bottom: 3px solid var(--rar-col, #94a3b8);
+      color: var(--text);
+      font-size: 0.62rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.12s ease;
+    }
+
+    .trade-tile:hover { transform: translateY(-2px); border-color: var(--rar-col, #22d3ee); }
+    .trade-tile.selected { outline: 2px solid #22d3ee; background: rgba(34, 211, 238, 0.16); }
+    .trade-tile-icon { font-size: 1.25rem; line-height: 1; }
+    .trade-tile-name { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.15; }
+
     .rar-common { --rar-col: #94a3b8; }
     .rar-rare { --rar-col: #38bdf8; }
     .rar-epic { --rar-col: #c084fc; }
@@ -4008,6 +4184,102 @@
     </div>
   </div>
 
+  <!-- Right-Click Remote Cursor Context Menu -->
+  <div id="cursor-ctx-menu" role="menu" aria-label="Player cursor actions">
+    <div class="ctx-head">
+      <span id="ctx-peer-name">Player</span>
+      <button type="button" class="icon-btn" id="ctx-close" aria-label="Close menu">&times;</button>
+    </div>
+    <div style="font-size:0.68rem;color:var(--muted);font-weight:750">⚔️ 1v1 COIN DUEL (WINNER TAKES POT)</div>
+    <div class="ctx-wager-row" id="ctx-wager-row">
+      <button type="button" class="ctx-wager-btn" data-wager="50">50 🪙</button>
+      <button type="button" class="ctx-wager-btn" data-wager="250">250 🪙</button>
+      <button type="button" class="ctx-wager-btn" data-wager="1000">1K 🪙</button>
+      <button type="button" class="ctx-wager-btn" data-wager="2500">2.5K 🪙</button>
+    </div>
+    <button type="button" class="ctx-action-btn" id="ctx-trade-btn">
+      <span>🤝 Trade Items &amp; Coins</span>
+      <span style="font-size:0.66rem;color:#22d3ee">CS:GO</span>
+    </button>
+  </div>
+
+  <!-- 1v1 Coin Duel Modal -->
+  <div class="modal-backdrop" id="duel-modal" role="dialog" aria-modal="true" aria-labelledby="duel-title">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="duel-title">⚔️ 1v1 Coin Duel</h2>
+        <button type="button" class="icon-btn" id="duel-close">&times;</button>
+      </div>
+      <div class="duel-coin-stage">
+        <div class="duel-coin-disc" id="duel-coin-disc">🪙</div>
+        <div id="duel-desc" style="text-align:center;font-size:0.9rem;font-weight:750"></div>
+      </div>
+      <div class="modal-foot" id="duel-actions" style="justify-content:center;gap:10px">
+        <button type="button" class="ghost-btn" id="duel-decline-btn">🐔 Chicken Out</button>
+        <button type="button" class="add-btn" id="duel-accept-btn">Accept &amp; Flip 🪙</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Incoming CS:GO Trade Invite Modal -->
+  <div class="modal-backdrop" id="trade-invite-modal" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>🤝 Incoming Trade Offer</h2>
+        <button type="button" class="icon-btn" id="trade-inv-close">&times;</button>
+      </div>
+      <p id="trade-inv-desc" style="margin:10px 0 14px;font-size:0.88rem"></p>
+      <div class="modal-foot" style="justify-content:flex-end;gap:8px">
+        <button type="button" class="ghost-btn" id="trade-inv-decline">Decline</button>
+        <button type="button" class="add-btn" id="trade-inv-accept">Open Trade Window 🤝</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CS:GO Live Trade Window Modal -->
+  <div class="modal-backdrop" id="trade-modal" role="dialog" aria-modal="true" aria-labelledby="trade-title">
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <h2 id="trade-title">🤝 CS:GO Live Trade Offer</h2>
+        <button type="button" class="icon-btn" id="trade-close">&times;</button>
+      </div>
+      <div class="trade-panes">
+        <div class="trade-pane" id="trade-you-pane">
+          <div class="trade-pane-head">
+            <span id="trade-you-title">You Offer</span>
+            <span class="stat-chip" id="trade-you-status" style="font-size:0.68rem">Editing</span>
+          </div>
+          <div class="trade-grid" id="trade-you-grid"></div>
+          <div class="field-row" style="margin:0;gap:6px">
+            <input type="number" id="trade-coins-input" min="0" step="25" value="0" placeholder="Coins 🪙" style="max-width:120px" />
+            <button type="button" class="ghost-btn" id="trade-coins-apply" style="padding:6px 10px;font-size:0.74rem">Set 🪙</button>
+          </div>
+        </div>
+        <div class="trade-pane" id="trade-partner-pane">
+          <div class="trade-pane-head">
+            <span id="trade-partner-title">Partner Offers</span>
+            <span class="stat-chip" id="trade-partner-status" style="font-size:0.68rem">Editing</span>
+          </div>
+          <div class="trade-grid" id="trade-partner-grid"></div>
+          <div class="stat-chip mono" id="trade-partner-coins" style="align-self:flex-start;color:#fbbf24">🪙 0 offered</div>
+        </div>
+      </div>
+      <div class="activity-head" style="margin-bottom:6px">
+        <span>🎒 Click Items From Your Stash to Offer</span>
+        <span style="font-size:0.68rem;color:var(--muted)">Anti-scam: editing resets both locks</span>
+      </div>
+      <div class="trade-grid" id="trade-stash-grid" style="max-height:135px"></div>
+      <div class="key-feedback" id="trade-feedback" style="margin-top:8px"></div>
+      <div class="modal-foot" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <button type="button" class="ghost-btn" id="trade-cancel-btn">Cancel Trade</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="ghost-btn" id="trade-ready-btn">🔒 Lock Offer</button>
+          <button type="button" class="add-btn" id="trade-confirm-btn" disabled>✅ Confirm Trade</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Set Username Modal -->
   <div class="modal-backdrop" id="username-modal" role="dialog" aria-modal="true" aria-labelledby="username-title">
     <div class="modal">
@@ -4421,9 +4693,19 @@
         orb.style.background = p.isAdmin ? "#fbbf24" : p.color;
         orb.style.color = p.isAdmin ? "#fbbf24" : p.color;
         if (p.isAdmin) {
-          orb.title = `👑 ${p.name || "Admin"} in the room`;
+          orb.title = `👑 ${p.name || "Admin"} in the room (Click to Duel / Trade)`;
         } else if (p.name) {
-          orb.title = p.name;
+          orb.title = `${p.name} (Click to Duel / Trade)`;
+        }
+        if (p.id && p.id !== myPeerId) {
+          orb.style.cursor = "pointer";
+          orb.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (window.openCursorContextMenu) {
+              const r = orb.getBoundingClientRect();
+              window.openCursorContextMenu(p.id, p.name || `User#${p.id.slice(0, 4)}`, r.left, r.bottom + 8);
+            }
+          });
         }
         orbStack.appendChild(orb);
       }
@@ -4992,6 +5274,7 @@
       const wsParams = new URLSearchParams();
       if (apiKey) wsParams.set("api_key", apiKey);
       if (adminToken) wsParams.set("admin_token", adminToken);
+      if (playerId) wsParams.set("player_id", playerId);
       if (playerName) wsParams.set("name", playerName);
       if (playerLoadout.cursorSkin) wsParams.set("cursor_skin", playerLoadout.cursorSkin);
       if (playerLoadout.title) wsParams.set("title", playerLoadout.title);
@@ -5033,6 +5316,13 @@
           }
           if (msg.type === "chat") {
             if (window.handleRoomChat) window.handleRoomChat(msg);
+            return;
+          }
+          if (
+            msg.type &&
+            (msg.type.startsWith("duel_") || msg.type.startsWith("trade_") || msg.type === "pvp_error")
+          ) {
+            if (window.handlePvpEvent) window.handlePvpEvent(msg);
             return;
           }
           if (typeof msg.online === "number") onlineCount = msg.online;
@@ -6579,6 +6869,371 @@
     fetchTodos();
     connectWebSocket();
 
+    // =========================================================================
+    // Cursor Right-Click Menu + 1v1 Coin Duel + CS:GO Live Trade Window
+    // =========================================================================
+    (function initCursorPvpAndTrade() {
+      const ctxMenu = document.getElementById("cursor-ctx-menu");
+      const ctxPeerName = document.getElementById("ctx-peer-name");
+      const ctxClose = document.getElementById("ctx-close");
+      const ctxWagerRow = document.getElementById("ctx-wager-row");
+      const ctxTradeBtn = document.getElementById("ctx-trade-btn");
+
+      const duelModal = document.getElementById("duel-modal");
+      const duelClose = document.getElementById("duel-close");
+      const duelCoinDisc = document.getElementById("duel-coin-disc");
+      const duelDesc = document.getElementById("duel-desc");
+      const duelActions = document.getElementById("duel-actions");
+      const duelDeclineBtn = document.getElementById("duel-decline-btn");
+      const duelAcceptBtn = document.getElementById("duel-accept-btn");
+
+      const tradeInvModal = document.getElementById("trade-invite-modal");
+      const tradeInvClose = document.getElementById("trade-inv-close");
+      const tradeInvDesc = document.getElementById("trade-inv-desc");
+      const tradeInvDecline = document.getElementById("trade-inv-decline");
+      const tradeInvAccept = document.getElementById("trade-inv-accept");
+
+      const tradeModal = document.getElementById("trade-modal");
+      const tradeClose = document.getElementById("trade-close");
+      const tradeYouPane = document.getElementById("trade-you-pane");
+      const tradeYouTitle = document.getElementById("trade-you-title");
+      const tradeYouStatus = document.getElementById("trade-you-status");
+      const tradeYouGrid = document.getElementById("trade-you-grid");
+      const tradeCoinsInput = document.getElementById("trade-coins-input");
+      const tradeCoinsApply = document.getElementById("trade-coins-apply");
+      const tradePartnerPane = document.getElementById("trade-partner-pane");
+      const tradePartnerTitle = document.getElementById("trade-partner-title");
+      const tradePartnerStatus = document.getElementById("trade-partner-status");
+      const tradePartnerGrid = document.getElementById("trade-partner-grid");
+      const tradePartnerCoins = document.getElementById("trade-partner-coins");
+      const tradeStashGrid = document.getElementById("trade-stash-grid");
+      const tradeFeedback = document.getElementById("trade-feedback");
+      const tradeCancelBtn = document.getElementById("trade-cancel-btn");
+      const tradeReadyBtn = document.getElementById("trade-ready-btn");
+      const tradeConfirmBtn = document.getElementById("trade-confirm-btn");
+
+      let ctxTargetPeer = null;
+      let activeDuelId = null;
+      let incomingTradeId = null;
+      let currentTrade = null;
+
+      function hideCtxMenu() {
+        if (ctxMenu) ctxMenu.classList.remove("open");
+        ctxTargetPeer = null;
+      }
+
+      window.openCursorContextMenu = (peerId, displayName, clientX, clientY) => {
+        if (!ctxMenu || !peerId || peerId === myPeerId) return;
+        ctxTargetPeer = { id: peerId, name: displayName || `User#${peerId.slice(0, 4)}` };
+        ctxPeerName.textContent = `👤 ${ctxTargetPeer.name}`;
+        ctxMenu.classList.add("open");
+        const mw = ctxMenu.offsetWidth || 240;
+        const mh = ctxMenu.offsetHeight || 150;
+        const x = Math.min(Math.max(8, clientX), window.innerWidth - mw - 8);
+        const y = Math.min(Math.max(8, clientY), window.innerHeight - mh - 8);
+        ctxMenu.style.left = `${x}px`;
+        ctxMenu.style.top = `${y}px`;
+        sfx.chipClick(1.2);
+      };
+
+      window.addEventListener("contextmenu", (e) => {
+        if (!window.findRemotePeerAtPoint) return;
+        const hit = window.findRemotePeerAtPoint(e.clientX, e.clientY);
+        if (hit) {
+          e.preventDefault();
+          window.openCursorContextMenu(hit.id, hit.name, e.clientX, e.clientY);
+        }
+      });
+
+      window.addEventListener("pointerdown", (e) => {
+        if (ctxMenu && ctxMenu.classList.contains("open") && !ctxMenu.contains(e.target)) {
+          hideCtxMenu();
+        }
+      });
+
+      if (ctxClose) ctxClose.addEventListener("click", hideCtxMenu);
+
+      if (ctxWagerRow) {
+        ctxWagerRow.querySelectorAll(".ctx-wager-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            if (!ctxTargetPeer) return;
+            const wager = Number(btn.dataset.wager || 50);
+            sfx.betPlaced();
+            sendWs({ type: "duel_challenge", targetPeerId: ctxTargetPeer.id, wager });
+            hideCtxMenu();
+          });
+        });
+      }
+
+      if (ctxTradeBtn) {
+        ctxTradeBtn.addEventListener("click", () => {
+          if (!ctxTargetPeer) return;
+          sfx.chipClick();
+          sendWs({ type: "trade_invite", targetPeerId: ctxTargetPeer.id });
+          hideCtxMenu();
+        });
+      }
+
+      if (duelClose) duelClose.addEventListener("click", () => duelModal.classList.remove("open"));
+      if (duelDeclineBtn) {
+        duelDeclineBtn.addEventListener("click", () => {
+          if (activeDuelId) sendWs({ type: "duel_respond", duelId: activeDuelId, accept: false });
+          activeDuelId = null;
+          duelModal.classList.remove("open");
+        });
+      }
+      if (duelAcceptBtn) {
+        duelAcceptBtn.addEventListener("click", () => {
+          if (!activeDuelId) return;
+          duelActions.style.display = "none";
+          duelCoinDisc.classList.add("spinning");
+          duelDesc.textContent = "🪙 Flipping coin on server...";
+          sfx.betPlaced();
+          sendWs({ type: "duel_respond", duelId: activeDuelId, accept: true });
+          activeDuelId = null;
+        });
+      }
+
+      if (tradeInvClose) tradeInvClose.addEventListener("click", () => tradeInvModal.classList.remove("open"));
+      if (tradeInvDecline) {
+        tradeInvDecline.addEventListener("click", () => {
+          if (incomingTradeId) sendWs({ type: "trade_accept", tradeId: incomingTradeId, accept: false });
+          incomingTradeId = null;
+          tradeInvModal.classList.remove("open");
+        });
+      }
+      if (tradeInvAccept) {
+        tradeInvAccept.addEventListener("click", () => {
+          if (!incomingTradeId) return;
+          sfx.equip();
+          sendWs({ type: "trade_accept", tradeId: incomingTradeId, accept: true });
+          incomingTradeId = null;
+          tradeInvModal.classList.remove("open");
+        });
+      }
+
+      function makeTradeTile(item, selected, onClick) {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = `trade-tile rar-${item.rarity || "common"}${selected ? " selected" : ""}`;
+        el.title = `${item.name} (${String(item.rarity || "").toUpperCase()})`;
+        const ic = document.createElement("span");
+        ic.className = "trade-tile-icon";
+        ic.textContent = item.icon || "🎁";
+        const nm = document.createElement("span");
+        nm.className = "trade-tile-name";
+        nm.textContent = item.name;
+        el.append(ic, nm);
+        if (onClick) el.addEventListener("click", onClick);
+        return el;
+      }
+
+      function sendTradeUpdate(items, coins) {
+        if (!currentTrade) return;
+        sendWs({
+          type: "trade_update",
+          tradeId: currentTrade.tradeId,
+          items,
+          coins: Math.max(0, Math.round(Number(coins || 0))),
+        });
+      }
+
+      function renderTradeModal() {
+        if (!currentTrade) return;
+        const { you, partner } = currentTrade;
+        const offeredSet = new Set(you.offeredIds || []);
+
+        tradeYouTitle.textContent = `You (${you.name}) · ${you.balance.toLocaleString()} 🪙`;
+        tradePartnerTitle.textContent = `${partner.name} · ${partner.balance.toLocaleString()} 🪙`;
+
+        tradeYouPane.classList.toggle("is-ready", Boolean(you.ready));
+        tradePartnerPane.classList.toggle("is-ready", Boolean(partner.ready));
+        tradeYouStatus.textContent = you.confirmed ? "✅ Confirmed" : you.ready ? "🔒 Locked" : "✏️ Editing";
+        tradePartnerStatus.textContent = partner.confirmed ? "✅ Confirmed" : partner.ready ? "🔒 Locked" : "✏️ Editing";
+
+        if (document.activeElement !== tradeCoinsInput) {
+          tradeCoinsInput.value = String(you.coins || 0);
+        }
+        tradeCoinsInput.max = String(you.balance || 0);
+        tradePartnerCoins.textContent = `🪙 ${(partner.coins || 0).toLocaleString()} (${formatCash(partner.coins || 0)}) offered`;
+
+        tradeYouGrid.innerHTML = "";
+        for (const item of you.offeredItems || []) {
+          tradeYouGrid.appendChild(
+            makeTradeTile(item, false, () => {
+              sfx.chipClick(0.9);
+              sendTradeUpdate((you.offeredIds || []).filter((id) => id !== item.id), you.coins || 0);
+            })
+          );
+        }
+
+        tradePartnerGrid.innerHTML = "";
+        for (const item of partner.offeredItems || []) {
+          tradePartnerGrid.appendChild(makeTradeTile(item, false, null));
+        }
+
+        tradeStashGrid.innerHTML = "";
+        const inv = you.inventory || [];
+        if (inv.length === 0) {
+          const empty = document.createElement("div");
+          empty.style.cssText = "grid-column:1/-1;text-align:center;color:var(--muted);font-size:0.74rem;padding:18px";
+          empty.textContent = "No tradeable cosmetics in stash yet — crack a crate or offer Coins 🪙!";
+          tradeStashGrid.appendChild(empty);
+        } else {
+          for (const item of inv) {
+            const isIn = offeredSet.has(item.id);
+            tradeStashGrid.appendChild(
+              makeTradeTile(item, isIn, () => {
+                sfx.chipClick(isIn ? 0.9 : 1.15);
+                const nextIds = isIn
+                  ? (you.offeredIds || []).filter((id) => id !== item.id)
+                  : [...(you.offeredIds || []), item.id];
+                sendTradeUpdate(nextIds, you.coins || 0);
+              })
+            );
+          }
+        }
+
+        tradeReadyBtn.textContent = you.ready ? "🔓 Unlock Offer" : "🔒 Lock Offer";
+        const bothReady = Boolean(you.ready && partner.ready);
+        tradeConfirmBtn.disabled = !bothReady || Boolean(you.confirmed);
+        tradeConfirmBtn.textContent = you.confirmed ? "⏳ Waiting on Partner..." : "✅ Confirm Trade";
+
+        if (bothReady && !you.confirmed) {
+          tradeFeedback.className = "key-feedback ok";
+          tradeFeedback.textContent = "Both offers locked! Click ✅ Confirm Trade to execute atomically.";
+        } else if (you.confirmed) {
+          tradeFeedback.className = "key-feedback ok";
+          tradeFeedback.textContent = `Waiting for ${partner.name} to confirm...`;
+        } else {
+          tradeFeedback.className = "key-feedback";
+          tradeFeedback.textContent = "";
+        }
+      }
+
+      if (tradeCoinsApply) {
+        tradeCoinsApply.addEventListener("click", () => {
+          if (!currentTrade) return;
+          sfx.chipClick();
+          const maxCoins = currentTrade.you.balance || 0;
+          const val = Math.max(0, Math.min(maxCoins, Math.floor(Number(tradeCoinsInput.value || 0))));
+          sendTradeUpdate(currentTrade.you.offeredIds || [], val);
+        });
+      }
+
+      if (tradeReadyBtn) {
+        tradeReadyBtn.addEventListener("click", () => {
+          if (!currentTrade) return;
+          sfx.equip();
+          sendWs({ type: "trade_ready", tradeId: currentTrade.tradeId, ready: !currentTrade.you.ready });
+        });
+      }
+
+      if (tradeConfirmBtn) {
+        tradeConfirmBtn.addEventListener("click", () => {
+          if (!currentTrade) return;
+          sfx.betPlaced();
+          sendWs({ type: "trade_confirm", tradeId: currentTrade.tradeId });
+        });
+      }
+
+      function closeAndCancelTrade() {
+        if (currentTrade) {
+          sendWs({ type: "trade_cancel", tradeId: currentTrade.tradeId });
+          currentTrade = null;
+        }
+        tradeModal.classList.remove("open");
+      }
+
+      if (tradeCancelBtn) tradeCancelBtn.addEventListener("click", closeAndCancelTrade);
+      if (tradeClose) tradeClose.addEventListener("click", closeAndCancelTrade);
+
+      window.handlePvpEvent = (msg) => {
+        if (msg.type === "pvp_error") {
+          sfx.betLost();
+          showToast(msg.error || "Action failed", "web");
+          return;
+        }
+        if (msg.type === "duel_sent") {
+          showToast(`⚔️ Challenged ${msg.toName} for ${msg.wager.toLocaleString()} 🪙!`, "web");
+          return;
+        }
+        if (msg.type === "duel_incoming") {
+          activeDuelId = msg.duelId;
+          duelCoinDisc.classList.remove("spinning");
+          duelCoinDisc.textContent = "⚔️🪙";
+          duelDesc.textContent = `${msg.fromName} challenges you to a 1v1 COIN DUEL for ${Number(msg.wager).toLocaleString()} 🪙 (${formatCash(msg.wager)})!`;
+          duelActions.style.display = "flex";
+          sfx.betPlaced();
+          duelModal.classList.add("open");
+          return;
+        }
+        if (msg.type === "duel_result") {
+          if (msg.wallet) {
+            wallet = msg.wallet;
+            updateWalletPill();
+          }
+          duelCoinDisc.classList.remove("spinning");
+          duelActions.style.display = "none";
+          if (msg.won) {
+            duelCoinDisc.textContent = "👑🤑";
+            duelDesc.textContent = `VICTORY! You slew ${msg.loserName} & won +${Number(msg.wager).toLocaleString()} 🪙 (${formatCash(msg.wager)})!`;
+            sfx.betWon();
+            burstAtEl(duelCoinDisc, 34);
+          } else {
+            duelCoinDisc.textContent = "🤡💀";
+            duelDesc.textContent = `ELIMINATED by ${msg.winnerName}! Lost ${Number(msg.wager).toLocaleString()} 🪙 — 45s 🤡 Clown Shame active!`;
+            sfx.betLost();
+          }
+          duelModal.classList.add("open");
+          return;
+        }
+        if (msg.type === "trade_sent") {
+          showToast(`🤝 Sent CS:GO trade invite to ${msg.toName}...`, "web");
+          return;
+        }
+        if (msg.type === "trade_incoming") {
+          incomingTradeId = msg.tradeId;
+          tradeInvDesc.textContent = `${msg.fromName} wants to trade Lootbox Stash items & Coins with you!`;
+          sfx.equip();
+          tradeInvModal.classList.add("open");
+          return;
+        }
+        if (msg.type === "trade_state") {
+          currentTrade = msg;
+          tradeInvModal.classList.remove("open");
+          tradeModal.classList.add("open");
+          renderTradeModal();
+          return;
+        }
+        if (msg.type === "trade_complete") {
+          if (msg.wallet) {
+            wallet = msg.wallet;
+            updateWalletPill();
+          }
+          if (Array.isArray(msg.inventory)) lootInventory = msg.inventory;
+          if (msg.loadout) {
+            playerLoadout = msg.loadout;
+            applySelfCursorAura();
+            syncCosmeticsWs();
+          }
+          renderLootboxModal();
+          currentTrade = null;
+          tradeModal.classList.remove("open");
+          sfx.betWon();
+          burstAtEl(lootboxBtn, 32);
+          showToast(msg.summary || "🤝 TRADE ACCEPTED ✅", "web");
+          return;
+        }
+        if (msg.type === "trade_closed") {
+          currentTrade = null;
+          tradeInvModal.classList.remove("open");
+          tradeModal.classList.remove("open");
+          showToast(msg.reason || "Trade closed", "web");
+        }
+      };
+    })();
+
     (function initGitHubStarBtn() {
       const ghBtn = document.getElementById("github-star-btn");
       const ghCount = document.getElementById("gh-star-count");
@@ -6844,15 +7499,17 @@
       }
 
       function cursorLabelFor(msg) {
+        const clown = msg.clownUntil && msg.clownUntil > Date.now() ? "🤡 SHAMED " : "";
         const crown = msg.isAdmin ? "👑 " : "";
         const title = msg.title ? `[${msg.title}] ` : "";
         const name = msg.isAdmin ? (msg.name || "ADMIN") : (msg.name || `User#${String(msg.peerId).slice(0, 4)}`);
-        return `${crown}${title}${name}`;
+        return `${clown}${crown}${title}${name}`;
       }
 
       function createRemoteCursorNode(msg) {
         const el = document.createElement("div");
-        el.className = "remote-cursor";
+        const isClowned = Boolean(msg.clownUntil && msg.clownUntil > Date.now());
+        el.className = `remote-cursor${isClowned ? " is-clowned" : ""}`;
         const auraEl = document.createElement("span");
         const aura = msg.cursorAura || "";
         auraEl.className = aura ? `cursor-aura-ring aura-${aura}` : "cursor-aura-ring";
@@ -6875,8 +7532,18 @@
 
         el.append(auraEl, svg, tag);
         cursorsLayer.appendChild(el);
-        return { el, auraEl, path, tag, color, skin: msg.cursorSkin || "arrow", aura };
+        return { el, auraEl, path, tag, color, skin: msg.cursorSkin || "arrow", aura, displayName: msg.name || `User#${String(msg.peerId).slice(0, 4)}` };
       }
+
+      window.findRemotePeerAtPoint = (cx, cy) => {
+        for (const [id, peer] of remoteCursors.entries()) {
+          const r = peer.el.getBoundingClientRect();
+          if (cx >= r.left - 16 && cx <= r.right + 16 && cy >= r.top - 16 && cy <= r.bottom + 16) {
+            return { id, name: peer.displayName || `User#${id.slice(0, 4)}` };
+          }
+        }
+        return null;
+      };
 
       window.handleRemoteCursor = (msg) => {
         if (!msg || !msg.peerId || msg.peerId === myPeerId) return;
@@ -6914,6 +7581,8 @@
             peer.aura = nextAura;
             peer.auraEl.className = nextAura ? `cursor-aura-ring aura-${nextAura}` : "cursor-aura-ring";
           }
+          peer.el.classList.toggle("is-clowned", Boolean(msg.clownUntil && msg.clownUntil > Date.now()));
+          if (msg.name) peer.displayName = msg.name;
           const nextLabel = cursorLabelFor(msg);
           if (peer.tag.textContent !== nextLabel) peer.tag.textContent = nextLabel;
           peer.tx = x;

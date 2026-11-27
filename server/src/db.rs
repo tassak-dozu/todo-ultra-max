@@ -1,6 +1,6 @@
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
@@ -1524,5 +1524,239 @@ impl TodoDB {
         )
         .map_err(|e| e.to_string())?;
         Ok(loadout)
+    }
+
+    pub fn get_tradeable_inventory(&self, raw_player_id: &str) -> Vec<LootDrop> {
+        let player_id: String = raw_player_id.trim().chars().take(64).collect();
+        if player_id.is_empty() {
+            return Vec::new();
+        }
+        let conn = self.conn.lock().unwrap();
+        Self::get_inventory_conn(&conn, &player_id, 80)
+            .into_iter()
+            .filter(|i| i.kind != "coins")
+            .collect()
+    }
+
+    pub fn resolve_coin_duel(
+        &self,
+        p1_id: &str,
+        p1_name: Option<&str>,
+        p2_id: &str,
+        p2_name: Option<&str>,
+        wager: i64,
+    ) -> Result<(bool, Wallet, Wallet), String> {
+        if wager < 10 || wager > 100_000 {
+            return Err("Duel wager must be between 10 and 100,000 coins".to_string());
+        }
+        if p1_id.trim() == p2_id.trim() {
+            return Err("You can't duel yourself!".to_string());
+        }
+        let mut conn = self.conn.lock().unwrap();
+        let mut w1 = Self::get_or_create_wallet_conn(&conn, p1_id, p1_name)?;
+        let mut w2 = Self::get_or_create_wallet_conn(&conn, p2_id, p2_name)?;
+        if w1.balance < wager {
+            return Err(format!("{} only has {} 🪙 (need {wager} 🪙)", w1.name, w1.balance));
+        }
+        if w2.balance < wager {
+            return Err(format!("{} only has {} 🪙 (need {wager} 🪙)", w2.name, w2.balance));
+        }
+
+        let p1_won = (Uuid::new_v4().as_u128() % 2) == 0;
+        if p1_won {
+            w1.balance += wager;
+            w1.wins += 1;
+            w1.total_won += wager;
+            w2.balance -= wager;
+            w2.losses += 1;
+        } else {
+            w2.balance += wager;
+            w2.wins += 1;
+            w2.total_won += wager;
+            w1.balance -= wager;
+            w1.losses += 1;
+        }
+        let now = now_ms();
+        let tx = conn.transaction().map_err(|e| e.to_string())?;
+        for w in [&w1, &w2] {
+            tx.execute(
+                "UPDATE wallets SET balance = ?, wins = ?, losses = ?, total_won = ?, updated_at = ? WHERE player_id = ?",
+                params![w.balance, w.wins, w.losses, w.total_won, now, &w.player_id],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok((p1_won, w1, w2))
+    }
+
+    pub fn execute_trade(
+        &self,
+        p1_id: &str,
+        p1_name: Option<&str>,
+        p1_items: &[String],
+        p1_coins: i64,
+        p2_id: &str,
+        p2_name: Option<&str>,
+        p2_items: &[String],
+        p2_coins: i64,
+    ) -> Result<(Wallet, Wallet, Vec<LootDrop>, Vec<LootDrop>, PlayerLoadout, PlayerLoadout, String), String> {
+        if p1_id.trim() == p2_id.trim() {
+            return Err("Can't trade with yourself!".to_string());
+        }
+        if p1_coins < 0 || p2_coins < 0 || p1_coins > 10_000_000 || p2_coins > 10_000_000 {
+            return Err("Invalid coin offer amount".to_string());
+        }
+        if p1_items.is_empty() && p2_items.is_empty() && p1_coins == 0 && p2_coins == 0 {
+            return Err("Trade offer cannot be completely empty!".to_string());
+        }
+
+        let s1: HashSet<&str> = p1_items.iter().map(|s| s.as_str()).collect();
+        let s2: HashSet<&str> = p2_items.iter().map(|s| s.as_str()).collect();
+        if s1.len() != p1_items.len() || s2.len() != p2_items.len() {
+            return Err("Duplicate item IDs in trade offer".to_string());
+        }
+
+        let mut conn = self.conn.lock().unwrap();
+        let mut w1 = Self::get_or_create_wallet_conn(&conn, p1_id, p1_name)?;
+        let mut w2 = Self::get_or_create_wallet_conn(&conn, p2_id, p2_name)?;
+        if w1.balance < p1_coins {
+            return Err(format!("{} doesn't have {p1_coins} 🪙 anymore", w1.name));
+        }
+        if w2.balance < p2_coins {
+            return Err(format!("{} doesn't have {p2_coins} 🪙 anymore", w2.name));
+        }
+
+        let tx = conn.transaction().map_err(|e| e.to_string())?;
+        for iid in p1_items {
+            let found: Option<String> = tx
+                .query_row(
+                    "SELECT kind FROM loot_inventory WHERE id = ? AND player_id = ?",
+                    params![iid, &w1.player_id],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(|e| e.to_string())?;
+            let Some(kind) = found else {
+                return Err(format!("{} no longer owns one of their offered items", w1.name));
+            };
+            if kind == "coins" {
+                return Err("Coin drops cannot be traded directly — use Coin Offer".to_string());
+            }
+        }
+        for iid in p2_items {
+            let found: Option<String> = tx
+                .query_row(
+                    "SELECT kind FROM loot_inventory WHERE id = ? AND player_id = ?",
+                    params![iid, &w2.player_id],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(|e| e.to_string())?;
+            let Some(kind) = found else {
+                return Err(format!("{} no longer owns one of their offered items", w2.name));
+            };
+            if kind == "coins" {
+                return Err("Coin drops cannot be traded directly — use Coin Offer".to_string());
+            }
+        }
+
+        let now = now_ms();
+        for iid in p1_items {
+            tx.execute(
+                "UPDATE loot_inventory SET player_id = ?, opened_at = ? WHERE id = ?",
+                params![&w2.player_id, now, iid],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        for iid in p2_items {
+            tx.execute(
+                "UPDATE loot_inventory SET player_id = ?, opened_at = ? WHERE id = ?",
+                params![&w1.player_id, now, iid],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+
+        w1.balance = w1.balance - p1_coins + p2_coins;
+        w2.balance = w2.balance - p2_coins + p1_coins;
+        tx.execute(
+            "UPDATE wallets SET balance = ?, updated_at = ? WHERE player_id = ?",
+            params![w1.balance, now, &w1.player_id],
+        )
+        .map_err(|e| e.to_string())?;
+        tx.execute(
+            "UPDATE wallets SET balance = ?, updated_at = ? WHERE player_id = ?",
+            params![w2.balance, now, &w2.player_id],
+        )
+        .map_err(|e| e.to_string())?;
+
+        // Unequip traded-away slots if sender has no remaining copy of that value
+        for pid in [&w1.player_id, &w2.player_id] {
+            let mut l = Self::get_loadout_conn(&tx, pid);
+            let mut dirty = false;
+            if let Some(ref skin) = l.cursor_skin {
+                let cnt: i64 = tx
+                    .query_row(
+                        "SELECT COUNT(*) FROM loot_inventory WHERE player_id = ? AND kind = 'cursor' AND value = ?",
+                        params![pid, skin],
+                        |r| r.get(0),
+                    )
+                    .unwrap_or(0);
+                if cnt == 0 {
+                    l.cursor_skin = None;
+                    dirty = true;
+                }
+            }
+            if let Some(ref tit) = l.title {
+                let cnt: i64 = tx
+                    .query_row(
+                        "SELECT COUNT(*) FROM loot_inventory WHERE player_id = ? AND kind = 'title' AND value = ?",
+                        params![pid, tit],
+                        |r| r.get(0),
+                    )
+                    .unwrap_or(0);
+                if cnt == 0 {
+                    l.title = None;
+                    dirty = true;
+                }
+            }
+            if let Some(ref au) = l.aura {
+                let cnt: i64 = tx
+                    .query_row(
+                        "SELECT COUNT(*) FROM loot_inventory WHERE player_id = ? AND kind = 'aura' AND value = ?",
+                        params![pid, au],
+                        |r| r.get(0),
+                    )
+                    .unwrap_or(0);
+                if cnt == 0 {
+                    l.aura = None;
+                    dirty = true;
+                }
+            }
+            if dirty {
+                let _ = tx.execute(
+                    "INSERT OR REPLACE INTO player_loadout (player_id, cursor_skin, title, aura, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    params![pid, &l.cursor_skin, &l.title, &l.aura, now],
+                );
+            }
+        }
+
+        tx.commit().map_err(|e| e.to_string())?;
+
+        let inv1 = Self::get_inventory_conn(&conn, &w1.player_id, 40);
+        let inv2 = Self::get_inventory_conn(&conn, &w2.player_id, 40);
+        let l1 = Self::get_loadout_conn(&conn, &w1.player_id);
+        let l2 = Self::get_loadout_conn(&conn, &w2.player_id);
+        let summary = format!(
+            "🤝 TRADE ACCEPTED: {} ({} item{}, {} 🪙) ⇄ {} ({} item{}, {} 🪙)!",
+            w1.name,
+            p1_items.len(),
+            if p1_items.len() == 1 { "" } else { "s" },
+            p1_coins,
+            w2.name,
+            p2_items.len(),
+            if p2_items.len() == 1 { "" } else { "s" },
+            p2_coins
+        );
+        Ok((w1, w2, inv1, inv2, l1, l2, summary))
     }
 }
