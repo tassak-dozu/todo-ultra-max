@@ -2486,6 +2486,479 @@
     .ai-built-watermark:hover {
       transform: scale(1.06);
     }
+
+    /* === LIQUID GLASS & OPTICAL REFLECTION SYSTEM === */
+    :root {
+      --lg-angle: 128deg;
+      --lg-gx: 50%;
+      --lg-gy: 20%;
+      --lg-glass: rgba(15, 20, 38, 0.28);
+      --lg-glass-strong: rgba(14, 18, 34, 0.44);
+      --lg-glass-card: rgba(255, 255, 255, 0.055);
+      --lg-glass-card-hover: rgba(255, 255, 255, 0.095);
+      --lg-top-sheen: linear-gradient(
+        177deg,
+        rgba(255, 255, 255, 0.22) 0%,
+        rgba(255, 255, 255, 0.07) 22%,
+        rgba(255, 255, 255, 0.01) 46%,
+        transparent 62%
+      );
+      --lg-inner-rim:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.56),
+        inset 1px 0 0 rgba(255, 255, 255, 0.24),
+        inset -1px 0 0 rgba(165, 243, 252, 0.20),
+        inset 0 -1.5px 0 rgba(103, 232, 249, 0.34),
+        inset 0 12px 28px rgba(255, 255, 255, 0.08),
+        inset 0 -14px 28px rgba(139, 92, 246, 0.08);
+      --lg-drop: 0 22px 60px rgba(0, 0, 0, 0.44), 0 2px 10px rgba(0, 0, 0, 0.28);
+    }
+
+    html[data-theme="light"] {
+      --lg-glass: rgba(255, 255, 255, 0.38);
+      --lg-glass-strong: rgba(255, 255, 255, 0.62);
+      --lg-glass-card: rgba(255, 255, 255, 0.48);
+      --lg-glass-card-hover: rgba(255, 255, 255, 0.72);
+      --lg-top-sheen: linear-gradient(
+        177deg,
+        rgba(255, 255, 255, 0.78) 0%,
+        rgba(255, 255, 255, 0.28) 26%,
+        rgba(255, 255, 255, 0.04) 50%,
+        transparent 64%
+      );
+      --lg-inner-rim:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.96),
+        inset 1px 0 0 rgba(255, 255, 255, 0.75),
+        inset -1px 0 0 rgba(196, 181, 253, 0.45),
+        inset 0 -1.5px 0 rgba(56, 189, 248, 0.40),
+        inset 0 10px 24px rgba(255, 255, 255, 0.48),
+        inset 0 -12px 24px rgba(139, 92, 246, 0.08);
+      --lg-drop: 0 20px 50px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.06);
+    }
+
+    @keyframes liquidSweep {
+      0% { transform: translateX(-160%) skewX(-24deg); opacity: 0; }
+      15% { opacity: 0.9; }
+      45%, 100% { transform: translateX(260%) skewX(-24deg); opacity: 0; }
+    }
+
+    @keyframes causticDrift {
+      0%, 100% { background-position: 0% 50%, 0% 0%; }
+      50% { background-position: 100% 50%, 100% 100%; }
+    }
+
+    /* Core Liquid Glass Optical Material on Panels & Containers */
+    .ai-hero,
+    .kpi-card,
+    .telemetry-strip,
+    .composer,
+    .column,
+    .list-shell,
+    .saas-trust,
+    .ai-footer,
+    .admin-dock,
+    .modal,
+    .support-panel,
+    .toast {
+      backdrop-filter: blur(28px) saturate(225%) contrast(106%) brightness(1.07);
+      -webkit-backdrop-filter: blur(28px) saturate(225%) contrast(106%) brightness(1.07);
+      box-shadow: var(--lg-inner-rim), var(--lg-drop);
+    }
+
+    .ai-hero {
+      background:
+        radial-gradient(460px circle at var(--mx, var(--lg-gx)) var(--my, var(--lg-gy)), rgba(255, 255, 255, 0.22), rgba(103, 232, 249, 0.10) 32%, transparent 65%),
+        var(--lg-top-sheen),
+        linear-gradient(var(--lg-angle), rgba(255, 255, 255, 0.09) 0%, rgba(139, 92, 246, 0.14) 38%, rgba(34, 211, 238, 0.12) 72%, rgba(244, 114, 182, 0.10) 100%),
+        var(--lg-glass);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+    }
+
+    html[data-theme="light"] .ai-hero {
+      background:
+        radial-gradient(460px circle at var(--mx, var(--lg-gx)) var(--my, var(--lg-gy)), rgba(255, 255, 255, 0.72), rgba(165, 243, 252, 0.24) 34%, transparent 65%),
+        var(--lg-top-sheen),
+        linear-gradient(var(--lg-angle), rgba(255, 255, 255, 0.62) 0%, rgba(139, 92, 246, 0.12) 45%, rgba(34, 211, 238, 0.14) 100%),
+        var(--lg-glass);
+      border-color: rgba(255, 255, 255, 0.85);
+    }
+
+    /* Curved Specular Glare Overlay on Hero + Composer + Columns + Modals */
+    .ai-hero::after,
+    .telemetry-strip::after,
+    .list-shell::after,
+    .modal::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      background:
+        linear-gradient(var(--lg-angle), transparent 22%, rgba(255, 255, 255, 0.16) 47%, rgba(165, 243, 252, 0.14) 51%, transparent 68%),
+        radial-gradient(ellipse 92% 38% at 50% -4%, rgba(255, 255, 255, 0.34), transparent 72%);
+      mix-blend-mode: screen;
+      opacity: 0.78;
+    }
+
+    html[data-theme="light"] .ai-hero::after,
+    html[data-theme="light"] .telemetry-strip::after,
+    html[data-theme="light"] .list-shell::after,
+    html[data-theme="light"] .modal::after {
+      mix-blend-mode: normal;
+      opacity: 0.85;
+    }
+
+    /* KPI Bento Liquid Glass Lenses */
+    .kpi-card,
+    .kpi-card:nth-child(1),
+    .kpi-card:nth-child(2),
+    .kpi-card:nth-child(3),
+    .kpi-card:nth-child(4) {
+      background:
+        radial-gradient(240px circle at var(--mx, 50%) var(--my, 15%), rgba(255, 255, 255, 0.28), rgba(165, 243, 252, 0.10) 40%, transparent 72%),
+        var(--lg-top-sheen),
+        linear-gradient(var(--lg-angle), rgba(255, 255, 255, 0.08), rgba(139, 92, 246, 0.14) 52%, rgba(34, 211, 238, 0.10)),
+        var(--lg-glass);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+    }
+
+    html[data-theme="light"] .kpi-card,
+    html[data-theme="light"] .kpi-card:nth-child(1),
+    html[data-theme="light"] .kpi-card:nth-child(2),
+    html[data-theme="light"] .kpi-card:nth-child(3),
+    html[data-theme="light"] .kpi-card:nth-child(4) {
+      background:
+        radial-gradient(240px circle at var(--mx, 50%) var(--my, 15%), rgba(255, 255, 255, 0.85), rgba(165, 243, 252, 0.22) 45%, transparent 74%),
+        var(--lg-top-sheen),
+        var(--lg-glass);
+      border-color: rgba(255, 255, 255, 0.82);
+    }
+
+    .kpi-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      width: 45%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.24), transparent);
+      animation: liquidSweep 7s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .kpi-card:nth-child(2)::after { animation-delay: 1.4s; }
+    .kpi-card:nth-child(3)::after { animation-delay: 2.8s; }
+    .kpi-card:nth-child(4)::after { animation-delay: 4.2s; }
+
+    /* Columns as Deep Refractive Crystal Slabs */
+    .column,
+    .column[data-status="in_progress"],
+    .column[data-status="done"] {
+      background:
+        radial-gradient(380px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, 0.14), transparent 65%),
+        var(--lg-top-sheen),
+        linear-gradient(170deg, rgba(255, 255, 255, 0.06) 0%, rgba(139, 92, 246, 0.09) 45%, rgba(34, 211, 238, 0.08) 100%),
+        var(--lg-glass);
+      border: 1px solid rgba(255, 255, 255, 0.20);
+    }
+
+    .column[data-status="in_progress"] {
+      background:
+        radial-gradient(380px circle at var(--mx, 50%) var(--my, 0%), rgba(165, 243, 252, 0.16), transparent 65%),
+        var(--lg-top-sheen),
+        linear-gradient(170deg, rgba(255, 255, 255, 0.06) 0%, rgba(34, 211, 238, 0.12) 50%, rgba(251, 191, 36, 0.08) 100%),
+        var(--lg-glass);
+    }
+
+    .column[data-status="done"] {
+      background:
+        radial-gradient(380px circle at var(--mx, 50%) var(--my, 0%), rgba(167, 243, 208, 0.16), transparent 65%),
+        var(--lg-top-sheen),
+        linear-gradient(170deg, rgba(255, 255, 255, 0.06) 0%, rgba(16, 185, 129, 0.12) 50%, rgba(34, 211, 238, 0.08) 100%),
+        var(--lg-glass);
+    }
+
+    html[data-theme="light"] .column,
+    html[data-theme="light"] .column[data-status="in_progress"],
+    html[data-theme="light"] .column[data-status="done"] {
+      background:
+        radial-gradient(380px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, 0.8), transparent 65%),
+        var(--lg-top-sheen),
+        var(--lg-glass);
+      border-color: rgba(255, 255, 255, 0.85);
+    }
+
+    .col-header {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.02)),
+        linear-gradient(90deg, rgba(139, 92, 246, 0.12), rgba(236, 72, 153, 0.06), rgba(34, 211, 238, 0.12));
+      border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    /* Task Cards: Curved Polished Liquid Glass Droplets with Anisotropic Specular Reflection */
+    .card {
+      background:
+        radial-gradient(240px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, 0.24), rgba(165, 243, 252, 0.08) 40%, transparent 72%),
+        var(--lg-top-sheen),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(139, 92, 246, 0.10) 48%, rgba(34, 211, 238, 0.08) 100%),
+        var(--lg-glass-card);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      backdrop-filter: blur(22px) saturate(215%) contrast(106%);
+      -webkit-backdrop-filter: blur(22px) saturate(215%) contrast(106%);
+      box-shadow:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.52),
+        inset 1px 0 0 rgba(255, 255, 255, 0.20),
+        inset 0 -1px 0 rgba(103, 232, 249, 0.28),
+        inset 0 8px 18px rgba(255, 255, 255, 0.07),
+        0 12px 30px rgba(0, 0, 0, 0.34);
+    }
+
+    .card:hover {
+      background:
+        radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, 0.34), rgba(165, 243, 252, 0.14) 40%, transparent 72%),
+        var(--lg-top-sheen),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(139, 92, 246, 0.16) 48%, rgba(236, 72, 153, 0.12) 100%),
+        var(--lg-glass-card-hover);
+      border-color: rgba(255, 255, 255, 0.44);
+      box-shadow:
+        inset 0 2px 0 rgba(255, 255, 255, 0.72),
+        inset 1px 0 0 rgba(255, 255, 255, 0.34),
+        inset 0 -1.5px 0 rgba(103, 232, 249, 0.45),
+        inset 0 12px 24px rgba(255, 255, 255, 0.12),
+        0 20px 44px rgba(0, 0, 0, 0.42),
+        0 0 26px rgba(103, 232, 249, 0.20);
+    }
+
+    html[data-theme="light"] .card {
+      background:
+        radial-gradient(240px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, 0.90), rgba(165, 243, 252, 0.20) 45%, transparent 72%),
+        var(--lg-top-sheen),
+        var(--lg-glass-card);
+      border-color: rgba(255, 255, 255, 0.85);
+      box-shadow:
+        inset 0 1.5px 0 rgba(255, 255, 255, 1),
+        inset 0 -1px 0 rgba(56, 189, 248, 0.32),
+        0 10px 26px rgba(15, 23, 42, 0.08);
+    }
+
+    /* Prismatic Chromatic Dispersion Rim + Dynamic Cursor Glint on Cards */
+    .card::before {
+      opacity: 0.55;
+      background:
+        radial-gradient(200px circle at var(--mx, 20%) var(--my, 10%), rgba(255, 255, 255, 0.30), rgba(165, 243, 252, 0.14) 36%, transparent 68%),
+        linear-gradient(125deg, rgba(255, 255, 255, 0.16) 0%, transparent 28%, transparent 72%, rgba(244, 114, 182, 0.10) 100%);
+      mix-blend-mode: screen;
+    }
+
+    .card:hover::before {
+      opacity: 1;
+    }
+
+    .card::after {
+      border: 1.5px solid transparent;
+      background: linear-gradient(
+        var(--lg-angle),
+        rgba(255, 255, 255, 0.78) 0%,
+        rgba(103, 232, 249, 0.46) 24%,
+        rgba(255, 255, 255, 0.06) 50%,
+        rgba(244, 114, 182, 0.44) 76%,
+        rgba(255, 255, 255, 0.65) 100%
+      ) border-box;
+      opacity: 0.65;
+    }
+
+    .card:hover::after {
+      opacity: 1;
+    }
+
+    /* Liquid Glass Composer, Telemetry, Pills & Interactive Buttons */
+    .composer {
+      position: relative;
+      background:
+        var(--lg-top-sheen),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(139, 92, 246, 0.09) 55%, rgba(34, 211, 238, 0.08)),
+        var(--lg-glass-strong);
+      border: 1px solid rgba(255, 255, 255, 0.20);
+    }
+
+    .composer input[type="text"],
+    .composer select,
+    .field-row input {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(16px) saturate(180%);
+      box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.35), inset 0 -1px 0 rgba(255, 255, 255, 0.14);
+    }
+
+    html[data-theme="light"] .composer input[type="text"],
+    html[data-theme="light"] .composer select,
+    html[data-theme="light"] .field-row input {
+      background: rgba(255, 255, 255, 0.65);
+      border-color: rgba(255, 255, 255, 0.9);
+      box-shadow: inset 0 1.5px 4px rgba(15, 23, 42, 0.08), inset 0 -1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    .telemetry-strip,
+    .saas-trust,
+    .ai-footer {
+      position: relative;
+      overflow: hidden;
+      background:
+        var(--lg-top-sheen),
+        linear-gradient(var(--lg-angle), rgba(255, 255, 255, 0.06), rgba(139, 92, 246, 0.10) 48%, rgba(34, 211, 238, 0.09)),
+        var(--lg-glass);
+      border: 1px solid rgba(255, 255, 255, 0.20);
+    }
+
+    .ghost-btn,
+    .live-pill,
+    .presence-orbs,
+    .segmented,
+    .ticker-btn,
+    .status-chip,
+    .chip-btn,
+    .bucket-card,
+    .card-market {
+      position: relative;
+      backdrop-filter: blur(22px) saturate(210%) brightness(1.06);
+      -webkit-backdrop-filter: blur(22px) saturate(210%) brightness(1.06);
+      background:
+        var(--lg-top-sheen),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.10), rgba(139, 92, 246, 0.08) 55%, rgba(34, 211, 238, 0.08)),
+        rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.24);
+      box-shadow:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.56),
+        inset 0 -1px 0 rgba(103, 232, 249, 0.24),
+        0 8px 22px rgba(0, 0, 0, 0.26);
+    }
+
+    html[data-theme="light"] .ghost-btn,
+    html[data-theme="light"] .live-pill,
+    html[data-theme="light"] .presence-orbs,
+    html[data-theme="light"] .segmented,
+    html[data-theme="light"] .ticker-btn,
+    html[data-theme="light"] .status-chip,
+    html[data-theme="light"] .chip-btn,
+    html[data-theme="light"] .bucket-card,
+    html[data-theme="light"] .card-market {
+      background:
+        var(--lg-top-sheen),
+        rgba(255, 255, 255, 0.56);
+      border-color: rgba(255, 255, 255, 0.88);
+      box-shadow:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.98),
+        inset 0 -1px 0 rgba(56, 189, 248, 0.24),
+        0 6px 18px rgba(15, 23, 42, 0.08);
+    }
+
+    .ghost-btn:hover {
+      border-color: rgba(255, 255, 255, 0.52);
+      box-shadow:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.78),
+        inset 0 -1.5px 0 rgba(103, 232, 249, 0.45),
+        0 12px 28px rgba(0, 0, 0, 0.34),
+        0 0 22px rgba(165, 243, 252, 0.24);
+    }
+
+    .add-btn,
+    .ai-magic-btn,
+    .seg-btn.active,
+    .ai-vibe-badge,
+    .ai-built-watermark {
+      box-shadow:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.65),
+        inset 0 -1.5px 0 rgba(103, 232, 249, 0.45),
+        inset 0 8px 16px rgba(255, 255, 255, 0.22),
+        0 12px 30px rgba(124, 58, 237, 0.38);
+    }
+
+    /* Glass Droplet Gloss Dome on Brand Mark & Support Avatar */
+    .brand-mark::after,
+    .support-avatar::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 5px;
+      right: 5px;
+      height: 44%;
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.05));
+      pointer-events: none;
+    }
+
+    .support-avatar { position: relative; overflow: hidden; }
+
+    /* Liquid Glass Floating Ribbon, Support FAB & Panel, Modals */
+    .saas-ribbon {
+      backdrop-filter: blur(24px) saturate(210%);
+      -webkit-backdrop-filter: blur(24px) saturate(210%);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.14), 0 8px 30px rgba(0, 0, 0, 0.28);
+    }
+
+    .support-fab {
+      background:
+        var(--lg-top-sheen),
+        linear-gradient(135deg, rgba(139, 92, 246, 0.34), rgba(34, 211, 238, 0.24)),
+        rgba(14, 18, 34, 0.42);
+      backdrop-filter: blur(26px) saturate(220%) brightness(1.08);
+      -webkit-backdrop-filter: blur(26px) saturate(220%) brightness(1.08);
+      border: 1px solid rgba(255, 255, 255, 0.34);
+      box-shadow: var(--lg-inner-rim), 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 28px rgba(34, 211, 238, 0.30);
+    }
+
+    .support-panel,
+    .modal {
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(360px circle at var(--lg-gx) var(--lg-gy), rgba(255, 255, 255, 0.16), transparent 60%),
+        var(--lg-top-sheen),
+        linear-gradient(150deg, rgba(255, 255, 255, 0.09), rgba(139, 92, 246, 0.12) 48%, rgba(34, 211, 238, 0.10)),
+        var(--lg-glass-strong);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+    }
+
+    html[data-theme="light"] .support-panel,
+    html[data-theme="light"] .modal {
+      background:
+        var(--lg-top-sheen),
+        var(--lg-glass-strong);
+      border-color: rgba(255, 255, 255, 0.90);
+    }
+
+    /* Subtle real SVG optical edge refraction where browser supports it in backdrop-filter */
+    @supports (backdrop-filter: url(#liquid-glass-lens)) {
+      .liquid-refract-badge {
+        backdrop-filter: url(#liquid-glass-lens) blur(22px) saturate(220%);
+      }
+    }
+
+    /* Keep special pills vibrant & invisible Turnstile silent probe crystal-clean */
+    .wallet-btn {
+      background:
+        var(--lg-top-sheen),
+        linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(139, 92, 246, 0.16));
+      border-color: rgba(251, 191, 36, 0.48);
+    }
+
+    .admin-btn.active {
+      background:
+        var(--lg-top-sheen),
+        linear-gradient(135deg, rgba(245, 158, 11, 0.56), rgba(244, 63, 94, 0.42), rgba(139, 92, 246, 0.52));
+      border-color: rgba(251, 191, 36, 0.85);
+    }
+
+    .modal-backdrop.silent-probe .modal {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      background: transparent;
+      box-shadow: none;
+      border: none;
+    }
+
+    .modal-backdrop.silent-probe .modal::after {
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -2501,6 +2974,15 @@
   </div>
   <div class="grid-bg"></div>
   <div class="ai-cursor-aura" id="ai-cursor-aura" aria-hidden="true"></div>
+  <svg width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true">
+    <defs>
+      <filter id="liquid-glass-lens" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.012 0.018" numOctaves="2" seed="7" result="noise" />
+        <feGaussianBlur in="noise" stdDeviation="2.5" result="smoothNoise" />
+        <feDisplacementMap in="SourceGraphic" in2="smoothNoise" scale="16" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
 
   <!-- Flashy SaaS Announcement Marquee -->
   <div class="saas-ribbon" aria-hidden="true">
@@ -4732,12 +5214,30 @@
     // =========================================================================
     (function initAiSlopEngine() {
       const cursorAura = document.getElementById("ai-cursor-aura");
-      if (cursorAura) {
-        window.addEventListener("pointermove", (e) => {
+      const rootStyle = document.documentElement.style;
+      window.addEventListener("pointermove", (e) => {
+        const vw = Math.max(1, window.innerWidth);
+        const vh = Math.max(1, window.innerHeight);
+        const nx = (e.clientX / vw) * 2 - 1;
+        const ny = (e.clientY / vh) * 2 - 1;
+        const deg = Math.round(128 + nx * 36 - ny * 18);
+        rootStyle.setProperty("--lg-angle", `${deg}deg`);
+        rootStyle.setProperty("--lg-gx", `${e.clientX}px`);
+        rootStyle.setProperty("--lg-gy", `${e.clientY}px`);
+        if (cursorAura) {
           cursorAura.style.setProperty("--gx", `${e.clientX}px`);
           cursorAura.style.setProperty("--gy", `${e.clientY}px`);
+        }
+      }, { passive: true });
+
+      // Per-panel specular cursor reflections across liquid glass surfaces
+      document.querySelectorAll(".ai-hero, .kpi-card, .column").forEach((panel) => {
+        panel.addEventListener("pointermove", (e) => {
+          const r = panel.getBoundingClientRect();
+          panel.style.setProperty("--mx", `${e.clientX - r.left}px`);
+          panel.style.setProperty("--my", `${e.clientY - r.top}px`);
         }, { passive: true });
-      }
+      });
 
       const streamBox = document.getElementById("ai-stream-box");
       const streamStatus = document.getElementById("ai-stream-status");
