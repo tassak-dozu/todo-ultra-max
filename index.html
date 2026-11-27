@@ -3056,9 +3056,20 @@
       box-shadow: var(--lg-inner-rim), 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 28px rgba(34, 211, 238, 0.30);
     }
 
-    .support-panel,
+    .support-panel {
+      position: fixed;
+      bottom: 76px;
+      right: 20px;
+      z-index: 46;
+      max-height: calc(100vh - 96px);
+    }
+
     .modal {
       position: relative;
+    }
+
+    .support-panel,
+    .modal {
       overflow: hidden;
       background:
         radial-gradient(360px circle at var(--lg-gx) var(--lg-gy), rgba(255, 255, 255, 0.08), transparent 60%),
