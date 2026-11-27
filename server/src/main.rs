@@ -55,6 +55,8 @@ struct ActivityEvent {
 struct PeerState {
     id: String,
     color: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
     typing: bool,
     dragging_id: Option<String>,
     is_admin: bool,
@@ -319,6 +321,7 @@ fn captcha_required_resp(st: &AppState) -> Response {
 struct KeyQuery {
     api_key: Option<String>,
     admin_token: Option<String>,
+    name: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -1111,10 +1114,20 @@ async fn ws_handler(
         return json_resp(StatusCode::UNAUTHORIZED, json!({ "error": "API key required" }));
     }
     let is_admin = st.is_admin(&headers, q.admin_token.as_deref());
-    ws.on_upgrade(move |socket| handle_socket(socket, st, is_admin))
+    let initial_name: Option<String> = q
+        .name
+        .as_deref()
+        .map(|n| n.trim().chars().take(24).collect())
+        .filter(|n: &String| !n.is_empty());
+    ws.on_upgrade(move |socket| handle_socket(socket, st, is_admin, initial_name))
 }
 
-async fn handle_socket(socket: WebSocket, st: Arc<AppState>, is_admin: bool) {
+async fn handle_socket(
+    socket: WebSocket,
+    st: Arc<AppState>,
+    is_admin: bool,
+    initial_name: Option<String>,
+) {
     let peer_id = Uuid::new_v4().to_string()[..8].to_string();
     let color = {
         let mut peers = st.peers.lock().unwrap();
@@ -1128,6 +1141,7 @@ async fn handle_socket(socket: WebSocket, st: Arc<AppState>, is_admin: bool) {
             PeerState {
                 id: peer_id.clone(),
                 color: color.clone(),
+                name: initial_name,
                 typing: false,
                 dragging_id: None,
                 is_admin,
@@ -1190,6 +1204,23 @@ async fn handle_socket(socket: WebSocket, st: Arc<AppState>, is_admin: bool) {
                             let t = val.get("t").and_then(|v| v.as_i64()).unwrap_or_else(now_ms);
                             let _ = direct_tx.send(json!({ "type": "pong", "t": t }).to_string());
                         }
+                        Some("set_name") => {
+                            let next_name: Option<String> = val
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .map(|n| n.trim().chars().take(24).collect())
+                                .filter(|n: &String| !n.is_empty());
+                            let mut changed = false;
+                            if let Some(p) = st_recv.peers.lock().unwrap().get_mut(&pid_recv) {
+                                if p.name != next_name {
+                                    p.name = next_name;
+                                    changed = true;
+                                }
+                            }
+                            if changed {
+                                st_recv.broadcast_presence();
+                            }
+                        }
                         Some("cursor") => {
                             let x = val.get("x").and_then(|v| v.as_f64());
                             let y = val.get("y").and_then(|v| v.as_f64());
@@ -1200,11 +1231,19 @@ async fn handle_socket(socket: WebSocket, st: Arc<AppState>, is_admin: bool) {
                                     && (-2000.0..=30000.0).contains(&y)
                                 {
                                     let down = val.get("down").and_then(|v| v.as_bool()).unwrap_or(false);
-                                    let name: Option<String> = val
+                                    let incoming_name: Option<String> = val
                                         .get("name")
                                         .and_then(|v| v.as_str())
                                         .map(|n| n.trim().chars().take(24).collect())
                                         .filter(|n: &String| !n.is_empty());
+                                    let name = incoming_name.or_else(|| {
+                                        st_recv
+                                            .peers
+                                            .lock()
+                                            .unwrap()
+                                            .get(&pid_recv)
+                                            .and_then(|p| p.name.clone())
+                                    });
                                     let payload = json!({
                                         "type": "cursor",
                                         "peerId": pid_recv,

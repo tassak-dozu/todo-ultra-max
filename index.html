@@ -3063,6 +3063,17 @@
       border: 1px solid rgba(255, 255, 255, 0.65);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 4px 12px rgba(0, 0, 0, 0.35);
     }
+
+    .user-btn {
+      border-color: rgba(34, 211, 238, 0.42);
+    }
+
+    .user-btn.needs-name {
+      border-color: rgba(244, 114, 182, 0.65);
+      box-shadow:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.55),
+        0 0 22px rgba(244, 114, 182, 0.32);
+    }
   </style>
 </head>
 <body>
@@ -3134,6 +3145,7 @@
           <button type="button" class="seg-btn active" data-view="kanban" role="tab">Kanban</button>
           <button type="button" class="seg-btn" data-view="list" role="tab">List</button>
         </div>
+        <button type="button" class="ghost-btn user-btn" id="username-btn" title="Set your display username">🪪 <span id="username-pill-text">Set Name</span></button>
         <button type="button" class="ghost-btn wallet-btn mono" id="wallet-btn" title="Aura Coins & Degenerate Leaderboard">🪙 1,000</button>
         <button type="button" class="ghost-btn admin-btn" id="admin-btn" title="Admin Aura Mode">👑 Admin</button>
         <button type="button" class="ghost-btn key-btn" id="key-btn">🔑 API Key</button>
@@ -3481,6 +3493,25 @@
       <div class="mini-list" id="leaderboard-list"></div>
       <div class="activity-head" style="margin-top:12px"><span>🎟️ Your Bets</span></div>
       <div class="mini-list" id="my-bets-list"></div>
+    </div>
+  </div>
+
+  <!-- Set Username Modal -->
+  <div class="modal-backdrop" id="username-modal" role="dialog" aria-modal="true" aria-labelledby="username-title">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="username-title">🪪 Set Your Username</h2>
+        <button type="button" class="icon-btn" id="username-close">&times;</button>
+      </div>
+      <p>Shown live on your cursor tag, presence orbs, and prediction gambling leaderboard.</p>
+      <div class="field-row">
+        <input type="text" id="username-modal-input" maxlength="24" placeholder="Enter your username..." autocomplete="nickname" />
+        <button type="button" class="ghost-btn" id="username-random" title="Generate random name">🎲 Random</button>
+      </div>
+      <div class="key-feedback" id="username-feedback"></div>
+      <div class="modal-foot">
+        <button type="button" class="add-btn" id="username-save">Save Username ⚡</button>
+      </div>
     </div>
   </div>
 
@@ -3873,7 +3904,11 @@
         orb.className = `orb${p.typing ? " typing" : ""}${p.isAdmin ? " admin" : ""}`;
         orb.style.background = p.isAdmin ? "#fbbf24" : p.color;
         orb.style.color = p.isAdmin ? "#fbbf24" : p.color;
-        if (p.isAdmin) orb.title = "👑 Admin in the room";
+        if (p.isAdmin) {
+          orb.title = `👑 ${p.name || "Admin"} in the room`;
+        } else if (p.name) {
+          orb.title = p.name;
+        }
         orbStack.appendChild(orb);
       }
 
@@ -4373,6 +4408,7 @@
       const wsParams = new URLSearchParams();
       if (apiKey) wsParams.set("api_key", apiKey);
       if (adminToken) wsParams.set("admin_token", adminToken);
+      if (playerName) wsParams.set("name", playerName);
       const qs = wsParams.toString();
       if (qs) wsUrl += `?${qs}`;
 
@@ -4640,6 +4676,7 @@
         supportPanel.classList.remove("open");
         betModal.classList.remove("open");
         walletModal.classList.remove("open");
+        usernameModal.classList.remove("open");
         cancelAuraCaptcha();
       }
     });
@@ -5121,14 +5158,89 @@
       if (e.target === walletModal) walletModal.classList.remove("open");
     });
 
-    playerNameSave.addEventListener("click", async () => {
-      const next = playerNameInput.value.trim().slice(0, 24);
-      if (!next) return;
+    // Username Controller (Topbar Pill + Modal + Live WS & Wallet Sync)
+    const usernameBtn = document.getElementById("username-btn");
+    const usernamePillText = document.getElementById("username-pill-text");
+    const usernameModal = document.getElementById("username-modal");
+    const usernameClose = document.getElementById("username-close");
+    const usernameModalInput = document.getElementById("username-modal-input");
+    const usernameRandom = document.getElementById("username-random");
+    const usernameFeedback = document.getElementById("username-feedback");
+    const usernameSave = document.getElementById("username-save");
+
+    const RANDOM_NAMES = [
+      "QuantumWizard", "RustGremlin", "NeonHamster", "LiquidGoblin",
+      "SynergyCEO", "VibeArchitect", "HyperPanda", "ZeroGC", "CursorKing",
+    ];
+
+    function updateUsernamePill() {
+      const hasCustom = Boolean(localStorage.getItem("board.customNameSet"));
+      if (usernamePillText) usernamePillText.textContent = playerName;
+      if (usernameBtn) usernameBtn.classList.toggle("needs-name", !hasCustom);
+    }
+
+    async function applyUsername(rawName) {
+      const next = String(rawName || "").trim().slice(0, 24);
+      if (!next) return false;
       playerName = next;
       localStorage.setItem("board.playerName", playerName);
+      localStorage.setItem("board.customNameSet", "1");
+      updateUsernamePill();
+      if (playerNameInput) playerNameInput.value = playerName;
+      sendWs({ type: "set_name", name: playerName });
       await fetchWallet();
+      return true;
+    }
+
+    updateUsernamePill();
+
+    usernameBtn.addEventListener("click", () => {
+      usernameFeedback.textContent = "";
+      usernameFeedback.className = "key-feedback";
+      usernameModalInput.value = playerName;
+      usernameModal.classList.add("open");
+      setTimeout(() => {
+        usernameModalInput.focus();
+        usernameModalInput.select();
+      }, 30);
+    });
+    usernameClose.addEventListener("click", () => usernameModal.classList.remove("open"));
+    usernameModal.addEventListener("click", (e) => {
+      if (e.target === usernameModal) usernameModal.classList.remove("open");
+    });
+
+    usernameRandom.addEventListener("click", () => {
+      const pickName = RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)] + "#" + Math.floor(10 + Math.random() * 89);
+      usernameModalInput.value = pickName;
+      usernameModalInput.focus();
+    });
+
+    async function submitUsernameModal() {
+      const val = usernameModalInput.value.trim().slice(0, 24);
+      if (!val) {
+        usernameFeedback.className = "key-feedback err";
+        usernameFeedback.textContent = "Username can't be empty!";
+        return;
+      }
+      await applyUsername(val);
+      burstAtEl(usernameSave, 20);
+      usernameModal.classList.remove("open");
+      showToast(`🪪 Username set to "${playerName}"!`, "web");
+    }
+
+    usernameSave.addEventListener("click", submitUsernameModal);
+    usernameModalInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submitUsernameModal();
+      }
+    });
+
+    playerNameSave.addEventListener("click", async () => {
+      const ok = await applyUsername(playerNameInput.value);
+      if (!ok) return;
       walletFeedback.className = "key-feedback ok";
-      walletFeedback.textContent = `Gambler tag updated to "${wallet.name}"!`;
+      walletFeedback.textContent = `Username updated to "${wallet.name || playerName}"!`;
     });
 
     bailoutBtn.addEventListener("click", async () => {
