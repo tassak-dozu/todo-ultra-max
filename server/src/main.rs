@@ -57,6 +57,7 @@ struct PeerState {
     color: String,
     typing: bool,
     dragging_id: Option<String>,
+    is_admin: bool,
 }
 
 struct AppState {
@@ -66,8 +67,10 @@ struct AppState {
     peers: Mutex<HashMap<String, PeerState>>,
     activity: Mutex<VecDeque<ActivityEvent>>,
     rate_buckets: Mutex<HashMap<String, (u32, i64)>>,
+    admin_login_buckets: Mutex<HashMap<String, (u32, i64)>>,
     mcp_calls: AtomicU64,
     api_key_hash: Option<[u8; 32]>,
+    admin_key_hash: Option<[u8; 32]>,
     auth_mode: String,
     write_limit_per_min: u32,
 }
@@ -79,6 +82,13 @@ fn sha256_bytes(val: &str) -> [u8; 32] {
     let mut arr = [0u8; 32];
     arr.copy_from_slice(&out);
     arr
+}
+
+fn sha256_hex(val: &str) -> String {
+    sha256_bytes(val)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<String>()
 }
 
 impl AppState {
@@ -136,6 +146,50 @@ impl AppState {
         }
         let k = self.extract_api_key(headers, None);
         !k.is_empty() && self.is_key_valid(&k)
+    }
+
+    fn extract_admin_token(&self, headers: &HeaderMap, query_token: Option<&str>) -> String {
+        if let Some(tok) = headers.get("x-admin-token").and_then(|v| v.to_str().ok()) {
+            return tok.trim().to_string();
+        }
+        if let Some(qt) = query_token {
+            return qt.trim().to_string();
+        }
+        String::new()
+    }
+
+    fn is_admin_token_valid(&self, tok: &str) -> bool {
+        let Some(expected) = &self.admin_key_hash else {
+            return false;
+        };
+        if tok.is_empty() {
+            return false;
+        }
+        let hashed = sha256_bytes(tok);
+        if bool::from(hashed.ct_eq(expected)) {
+            return true;
+        }
+        self.db.has_admin_session(&sha256_hex(tok))
+    }
+
+    fn is_admin(&self, headers: &HeaderMap, query_token: Option<&str>) -> bool {
+        let tok = self.extract_admin_token(headers, query_token);
+        self.is_admin_token_valid(&tok)
+    }
+
+    fn check_admin_login_rate(&self, ip: &str) -> bool {
+        let now = now_ms();
+        let mut map = self.admin_login_buckets.lock().unwrap();
+        let entry = map.entry(ip.to_string()).or_insert((0, now + 60_000));
+        if now >= entry.1 {
+            *entry = (1, now + 60_000);
+            return true;
+        }
+        if entry.0 >= 10 {
+            return false;
+        }
+        entry.0 += 1;
+        true
     }
 
     fn check_rate_limit(&self, ip: &str) -> bool {
@@ -264,6 +318,18 @@ fn captcha_required_resp(st: &AppState) -> Response {
 #[derive(Deserialize)]
 struct KeyQuery {
     api_key: Option<String>,
+    admin_token: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct AdminLoginBody {
+    password: Option<String>,
+    key: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct AdminNukeBody {
+    scope: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -332,12 +398,155 @@ async fn health(State(st): State<Arc<AppState>>) -> Response {
             "poweredBy": "AI + 🦀 Rust",
             "turnstileEnabled": st.captcha.is_enabled(),
             "turnstileSiteKey": st.captcha.site_key,
+            "adminConfigured": st.admin_key_hash.is_some(),
             "transport": "http+ws+mcp",
             "authMode": st.auth_mode,
             "online": online,
             "mcpCalls": st.mcp_calls.load(Ordering::Relaxed)
         }),
     )
+}
+
+async fn admin_status(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    json_resp(
+        StatusCode::OK,
+        json!({
+            "adminConfigured": st.admin_key_hash.is_some(),
+            "isAdmin": st.is_admin(&headers, None),
+            "captchaBypass": st.is_admin(&headers, None)
+        }),
+    )
+}
+
+async fn admin_login(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<AdminLoginBody>,
+) -> Response {
+    let Some(expected) = &st.admin_key_hash else {
+        return json_resp(
+            StatusCode::SERVICE_UNAVAILABLE,
+            json!({ "error": "ADMIN_KEY is not configured on the server" }),
+        );
+    };
+    let ip = st.client_ip(&headers);
+    if !st.check_admin_login_rate(&ip) {
+        return json_resp(
+            StatusCode::TOO_MANY_REQUESTS,
+            json!({ "error": "Too many admin login attempts — chill for 60s" }),
+        );
+    }
+    let candidate = body
+        .password
+        .as_deref()
+        .or(body.key.as_deref())
+        .unwrap_or("")
+        .trim();
+    if candidate.is_empty() || !bool::from(sha256_bytes(candidate).ct_eq(expected)) {
+        return json_resp(
+            StatusCode::UNAUTHORIZED,
+            json!({ "error": "Access denied — wrong Admin Password 💀" }),
+        );
+    }
+
+    let raw_token = format!("adm_{}_{}", Uuid::new_v4(), Uuid::new_v4());
+    let ttl_ms = 24 * 60 * 60 * 1000;
+    match st.db.create_admin_session(&sha256_hex(&raw_token), ttl_ms) {
+        Ok(expires_at) => json_resp(
+            StatusCode::OK,
+            json!({
+                "ok": true,
+                "adminToken": raw_token,
+                "expiresAt": expires_at,
+                "auraMode": true,
+                "captchaBypass": true
+            }),
+        ),
+        Err(e) => json_resp(StatusCode::INTERNAL_SERVER_ERROR, json!({ "error": e })),
+    }
+}
+
+async fn admin_logout(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    let tok = st.extract_admin_token(&headers, None);
+    if !tok.is_empty() {
+        st.db.delete_admin_session(&sha256_hex(&tok));
+    }
+    json_resp(StatusCode::OK, json!({ "ok": true }))
+}
+
+async fn admin_nuke(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<AdminNukeBody>,
+) -> Response {
+    if !st.is_admin(&headers, None) {
+        return json_resp(
+            StatusCode::UNAUTHORIZED,
+            json!({ "error": "Admin Aura Mode required to drop nukes 👑" }),
+        );
+    }
+    let scope = body.scope.as_deref().unwrap_or("done");
+    match scope {
+        "done" => match st.db.clear_completed() {
+            Ok(deleted) => {
+                let ev = st.record_activity(
+                    "cleared",
+                    "web",
+                    format!("👑☢️ ADMIN nuked {deleted} finished card(s)"),
+                    None,
+                );
+                st.broadcast_sync(Some(&ev), None);
+                json_resp(StatusCode::OK, json!({ "ok": true, "scope": "done", "deleted": deleted }))
+            }
+            Err(e) => json_resp(StatusCode::INTERNAL_SERVER_ERROR, json!({ "error": e })),
+        },
+        "bets" => match st.db.nuke_bets() {
+            Ok((refunded_bets, refunded_coins)) => {
+                let ev = st.record_activity(
+                    "cleared",
+                    "web",
+                    format!("👑🎰 ADMIN wiped markets & refunded {refunded_coins} 🪙 across {refunded_bets} open bet(s)"),
+                    None,
+                );
+                st.broadcast_sync(Some(&ev), None);
+                json_resp(
+                    StatusCode::OK,
+                    json!({
+                        "ok": true,
+                        "scope": "bets",
+                        "refundedBets": refunded_bets,
+                        "refundedCoins": refunded_coins
+                    }),
+                )
+            }
+            Err(e) => json_resp(StatusCode::INTERNAL_SERVER_ERROR, json!({ "error": e })),
+        },
+        "all" => match st.db.nuke_all() {
+            Ok((cards_deleted, refunded_bets)) => {
+                let ev = st.record_activity(
+                    "cleared",
+                    "web",
+                    format!("👑☢️ ADMIN NUKED THE ENTIRE BOARD ({cards_deleted} cards, {refunded_bets} open bets refunded)"),
+                    None,
+                );
+                st.broadcast_sync(Some(&ev), None);
+                json_resp(
+                    StatusCode::OK,
+                    json!({
+                        "ok": true,
+                        "scope": "all",
+                        "cardsDeleted": cards_deleted,
+                        "refundedBets": refunded_bets
+                    }),
+                )
+            }
+            Err(e) => json_resp(StatusCode::INTERNAL_SERVER_ERROR, json!({ "error": e })),
+        },
+        _ => json_resp(
+            StatusCode::BAD_REQUEST,
+            json!({ "error": "Invalid nuke scope (use 'done', 'bets', or 'all')" }),
+        ),
+    }
 }
 
 async fn verify_auth(
@@ -425,8 +634,8 @@ async fn create_todo(
         );
     }
 
-    // Adaptive Cloudflare Turnstile on adding tasks (bypassed when authenticated via API key)
-    if !st.has_valid_api_key_header(&headers) {
+    // Adaptive Cloudflare Turnstile on adding tasks (bypassed when Admin or authenticated via API key)
+    if !st.is_admin(&headers, None) && !st.has_valid_api_key_header(&headers) {
         let cap_tok = headers.get("x-captcha-token").and_then(|v| v.to_str().ok());
         if st.captcha.check_or_require(&ip, cap_tok).is_err() {
             if let Some(cf_tok) = headers.get("x-turnstile-token").and_then(|v| v.to_str().ok()) {
@@ -486,8 +695,15 @@ async fn clear_completed(
         );
     }
 
-    // Adaptive Cloudflare Turnstile on bulk delete
-    if !st.has_valid_api_key_header(&headers) {
+    if st.admin_key_hash.is_some() && !st.is_admin(&headers, None) {
+        return json_resp(
+            StatusCode::UNAUTHORIZED,
+            json!({ "error": "Admin Aura Mode required to bulk nuke done cards 👑" }),
+        );
+    }
+
+    // Adaptive Cloudflare Turnstile on bulk delete (bypassed when Admin or authenticated via API key)
+    if !st.is_admin(&headers, None) && !st.has_valid_api_key_header(&headers) {
         let cap_tok = headers.get("x-captcha-token").and_then(|v| v.to_str().ok());
         if st.captcha.check_or_require(&ip, cap_tok).is_err() {
             if let Some(cf_tok) = headers.get("x-turnstile-token").and_then(|v| v.to_str().ok()) {
@@ -596,8 +812,8 @@ async fn delete_todo(
         );
     }
 
-    // Adaptive Cloudflare Turnstile on removing tasks
-    if !st.has_valid_api_key_header(&headers) {
+    // Adaptive Cloudflare Turnstile on removing tasks (bypassed when Admin or authenticated via API key)
+    if !st.is_admin(&headers, None) && !st.has_valid_api_key_header(&headers) {
         let cap_tok = headers.get("x-captcha-token").and_then(|v| v.to_str().ok());
         if st.captcha.check_or_require(&ip, cap_tok).is_err() {
             if let Some(cf_tok) = headers.get("x-turnstile-token").and_then(|v| v.to_str().ok()) {
@@ -894,14 +1110,19 @@ async fn ws_handler(
     if !st.authorize(&headers, q.api_key.as_deref(), false) {
         return json_resp(StatusCode::UNAUTHORIZED, json!({ "error": "API key required" }));
     }
-    ws.on_upgrade(move |socket| handle_socket(socket, st))
+    let is_admin = st.is_admin(&headers, q.admin_token.as_deref());
+    ws.on_upgrade(move |socket| handle_socket(socket, st, is_admin))
 }
 
-async fn handle_socket(socket: WebSocket, st: Arc<AppState>) {
+async fn handle_socket(socket: WebSocket, st: Arc<AppState>, is_admin: bool) {
     let peer_id = Uuid::new_v4().to_string()[..8].to_string();
     let color = {
         let mut peers = st.peers.lock().unwrap();
-        let color = PEER_COLORS[peers.len() % PEER_COLORS.len()].to_string();
+        let color = if is_admin {
+            "#fbbf24".to_string()
+        } else {
+            PEER_COLORS[peers.len() % PEER_COLORS.len()].to_string()
+        };
         peers.insert(
             peer_id.clone(),
             PeerState {
@@ -909,6 +1130,7 @@ async fn handle_socket(socket: WebSocket, st: Arc<AppState>) {
                 color: color.clone(),
                 typing: false,
                 dragging_id: None,
+                is_admin,
             },
         );
         color
@@ -1038,6 +1260,13 @@ async fn main() {
         Some(sha256_bytes(&api_key))
     };
 
+    let admin_key = env::var("ADMIN_KEY").unwrap_or_default().trim().to_string();
+    let admin_key_hash = if admin_key.is_empty() {
+        None
+    } else {
+        Some(sha256_bytes(&admin_key))
+    };
+
     let turnstile_site_key = env::var("TURNSTILE_SITE_KEY").unwrap_or_default();
     let turnstile_secret_key = env::var("TURNSTILE_SECRET_KEY").unwrap_or_default();
     let turnstile_enabled = !turnstile_secret_key.trim().is_empty();
@@ -1052,8 +1281,10 @@ async fn main() {
         peers: Mutex::new(HashMap::new()),
         activity: Mutex::new(VecDeque::new()),
         rate_buckets: Mutex::new(HashMap::new()),
+        admin_login_buckets: Mutex::new(HashMap::new()),
         mcp_calls: AtomicU64::new(0),
         api_key_hash,
+        admin_key_hash,
         auth_mode: auth_mode.clone(),
         write_limit_per_min,
     });
@@ -1073,6 +1304,10 @@ async fn main() {
     let app = Router::new()
         .route("/api/health", get(health))
         .route("/api/auth/verify", get(verify_auth))
+        .route("/api/admin/status", get(admin_status))
+        .route("/api/admin/login", post(admin_login))
+        .route("/api/admin/logout", post(admin_logout))
+        .route("/api/admin/nuke", post(admin_nuke))
         .route("/api/captcha/verify", post(verify_captcha))
         .route(
             "/api/todos",

@@ -25,6 +25,7 @@
 - 🎰 **Card Completion Prediction Gambling** — Start with `1,000 🪙` Aura Coins and bet on when any open card finishes (`⚡ < 5 min`, `🔥 5m – 1h`, `🐢 1h – 24h`, `💀 24h+ / Nuked`) with live parimutuel odds, auto-settlement, emergency bailouts, global leaderboard, and MCP `place_bet` / `get_leaderboard` tools.
 - 🛡️ **Cloudflare Turnstile Gate** — Zero free unverified adds/deletes: any unverified IP must pass **Cloudflare Turnstile** (`interaction-only` — silent for trusted IPs/browsers, interactive only when Cloudflare flags risk) verified via server-side `siteverify`, unlocking 5 smooth moves for 5 minutes.
 - 📡 **Live Telemetry & Presence** — Real-time WebSocket RTT (`ms`), signal bars, stacked online viewer orbs, typing indicator, remote-drag neon glow, and live board gossip feed.
+- 👑 **Admin Aura Mode** — Password-protected admin login (`POST /api/admin/login`) unlocking **Turnstile Captcha Bypass**, golden aura crown presence, and nuclear powers (**🧹 Nuke Done**, **🎰 Refund & Wipe Bets**, **☢️ Nuke Whole Board**).
 - 🔐 **API Key Gatekeeper** — Optional `API_KEY` protection (`writes` or `all` mode) with constant-time SHA-256 verification and an in-app **🔑 VIP Pass** modal.
 
 ---
@@ -35,6 +36,8 @@
 | --- | --- |
 | `GET /api/health` | 💓 Health check, Rust engine telemetry, auth mode, online count & MCP calls |
 | `GET /api/auth/verify` | 🔑 Verify an API key (`Authorization: Bearer` / `X-API-Key` / `?api_key=`) |
+| `POST /api/admin/login` | 👑 Login to Admin Aura Mode (unlocks Captcha Bypass + Nukes) |
+| `POST /api/admin/nuke` | ☢️ Admin nuke (`{ "scope": "done" \| "bets" \| "all" }`) |
 | `POST /api/captcha/verify` | ✅ Verify Cloudflare Turnstile token via `siteverify` & unlock 5 moves |
 | `GET /api/todos` | 📋 Fetch all shared cards, open betting markets, leaderboard & activity |
 | `POST /api/todos` | ➕ Spawn a card (`{ "text", "status"?, "priority"? }`) |

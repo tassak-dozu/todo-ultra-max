@@ -502,6 +502,120 @@
       box-shadow: 0 0 18px rgba(244, 63, 94, 0.18);
     }
 
+    /* 👑 Admin Aura Mode */
+    .admin-btn {
+      border-color: rgba(251, 191, 36, 0.35);
+      color: #fde68a;
+    }
+
+    .admin-btn.active {
+      border-color: rgba(251, 191, 36, 0.85);
+      color: #fff;
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.45), rgba(244, 63, 94, 0.35), rgba(139, 92, 246, 0.45));
+      box-shadow: 0 0 28px rgba(251, 191, 36, 0.48), 0 0 14px rgba(244, 63, 94, 0.35);
+      animation: adminPulse 2.4s ease-in-out infinite alternate;
+    }
+
+    @keyframes adminPulse {
+      from { box-shadow: 0 0 18px rgba(251, 191, 36, 0.35); }
+      to { box-shadow: 0 0 34px rgba(251, 191, 36, 0.72), 0 0 18px rgba(244, 63, 94, 0.42); }
+    }
+
+    html[data-admin="true"] .aura-1 {
+      background: radial-gradient(circle, rgba(251, 191, 36, 0.55), transparent 68%);
+    }
+
+    html[data-admin="true"] .aura-4 {
+      background: radial-gradient(circle, rgba(244, 63, 94, 0.45), transparent 70%);
+    }
+
+    html[data-admin="true"] .brand-mark {
+      background: linear-gradient(135deg, #fbbf24 0%, #f43f5e 52%, #8b5cf6 100%);
+      box-shadow: 0 0 32px rgba(251, 191, 36, 0.7), inset 0 1px 1px rgba(255, 255, 255, 0.6);
+    }
+
+    .admin-dock {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      padding: 12px 16px;
+      border-radius: 16px;
+      background: linear-gradient(120deg, rgba(251, 191, 36, 0.14), rgba(244, 63, 94, 0.12), rgba(139, 92, 246, 0.16));
+      border: 1px solid rgba(251, 191, 36, 0.48);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 0 34px rgba(251, 191, 36, 0.18), var(--shadow);
+    }
+
+    html[data-admin="true"] .admin-dock {
+      display: flex;
+    }
+
+    .admin-dock-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 0.82rem;
+      font-weight: 750;
+      color: #fde68a;
+    }
+
+    html[data-theme="light"] .admin-dock-left { color: #b45309; }
+
+    .admin-badge {
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #090b10;
+      background: linear-gradient(135deg, #fde047, #fb923c);
+      box-shadow: 0 0 16px rgba(251, 191, 36, 0.55);
+    }
+
+    .admin-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .nuke-btn {
+      padding: 7px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(244, 63, 94, 0.45);
+      background: rgba(244, 63, 94, 0.14);
+      color: #fda4af;
+      font-size: 0.76rem;
+      font-weight: 750;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .nuke-btn:hover {
+      background: rgba(244, 63, 94, 0.28);
+      border-color: #f43f5e;
+      color: #fff;
+      box-shadow: 0 0 22px rgba(244, 63, 94, 0.42);
+      transform: translateY(-1px);
+    }
+
+    .nuke-btn.armed {
+      background: linear-gradient(135deg, #e11d48, #f97316);
+      border-color: #fde047;
+      color: #fff;
+      box-shadow: 0 0 30px rgba(244, 63, 94, 0.75);
+      animation: adminPulse 0.6s ease-in-out infinite alternate;
+    }
+
+    .orb.admin {
+      box-shadow: 0 0 14px #fbbf24, 0 0 0 2px #fde047;
+    }
+
     .wallet-btn {
       border-color: rgba(245, 158, 11, 0.45);
       color: #fbbf24;
@@ -1556,11 +1670,26 @@
           <button type="button" class="seg-btn" data-view="list" role="tab">List</button>
         </div>
         <button type="button" class="ghost-btn wallet-btn mono" id="wallet-btn" title="Aura Coins & Degenerate Leaderboard">🪙 1,000</button>
+        <button type="button" class="ghost-btn admin-btn" id="admin-btn" title="Admin Aura Mode">👑 Admin</button>
         <button type="button" class="ghost-btn key-btn" id="key-btn">🔑 API Key</button>
         <button type="button" class="ghost-btn" id="mcp-btn">🤖 MCP</button>
         <button type="button" class="ghost-btn" id="theme-btn" aria-label="Toggle theme">☀️ Flashbang</button>
       </div>
     </header>
+
+    <!-- Admin Aura Mode Nuclear Dock -->
+    <section class="admin-dock" id="admin-dock" aria-label="Admin Aura Mode Controls">
+      <div class="admin-dock-left">
+        <span class="admin-badge">👑 ADMIN AURA MODE</span>
+        <span>🛡️ Cloudflare Captcha Bypassed · Nuclear Clearance Active</span>
+      </div>
+      <div class="admin-actions">
+        <button type="button" class="nuke-btn" id="nuke-done-btn">🧹 Nuke Done</button>
+        <button type="button" class="nuke-btn" id="nuke-bets-btn">🎰 Refund &amp; Wipe Bets</button>
+        <button type="button" class="nuke-btn" id="nuke-all-btn">☢️ NUKE WHOLE BOARD</button>
+        <button type="button" class="ghost-btn" id="admin-logout-btn">🚪 Exit Aura</button>
+      </div>
+    </section>
 
     <!-- Live Telemetry Strip -->
     <div class="telemetry-strip">
@@ -1724,6 +1853,25 @@
     <span class="support-badge" id="support-badge">1</span>
   </button>
 
+  <!-- Admin Login Modal -->
+  <div class="modal-backdrop" id="admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-title">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="admin-title">👑 Admin Aura Login</h2>
+        <button type="button" class="icon-btn" id="admin-close">&times;</button>
+      </div>
+      <p>Enter the Admin Password to unlock <strong>Aura Mode</strong>: instant Cloudflare Turnstile bypass &amp; nuclear board controls.</p>
+      <div class="field-row">
+        <input type="password" id="admin-pass-input" placeholder="Enter Admin Password..." autocomplete="current-password" />
+        <button type="button" class="ghost-btn" id="admin-toggle-vis">Peek</button>
+      </div>
+      <div class="key-feedback" id="admin-feedback"></div>
+      <div class="modal-foot">
+        <button type="button" class="add-btn" id="admin-login-submit">Activate Aura Mode 👑</button>
+      </div>
+    </div>
+  </div>
+
   <!-- API Key Modal -->
   <div class="modal-backdrop" id="key-modal" role="dialog" aria-modal="true" aria-labelledby="key-title">
     <div class="modal">
@@ -1841,6 +1989,8 @@
     let selectedBucket = "speedrun";
 
     let apiKey = localStorage.getItem("board.apiKey") || "";
+    let adminToken = localStorage.getItem("board.adminToken") || "";
+    let isAdmin = false;
     let authMode = "none";
     let keyState = apiKey ? "set" : "none"; // none | set | valid | invalid | needed
 
@@ -2149,9 +2299,10 @@
       const list = peers.length > 0 ? peers.slice(0, 6) : [{ color: "#22d3ee", typing: false }];
       for (const p of list) {
         const orb = document.createElement("span");
-        orb.className = `orb${p.typing ? " typing" : ""}`;
-        orb.style.background = p.color;
-        orb.style.color = p.color;
+        orb.className = `orb${p.typing ? " typing" : ""}${p.isAdmin ? " admin" : ""}`;
+        orb.style.background = p.isAdmin ? "#fbbf24" : p.color;
+        orb.style.color = p.isAdmin ? "#fbbf24" : p.color;
+        if (p.isAdmin) orb.title = "👑 Admin in the room";
         orbStack.appendChild(orb);
       }
 
@@ -2214,6 +2365,9 @@
       }
       if (apiKey) {
         headers["Authorization"] = `Bearer ${apiKey}`;
+      }
+      if (adminToken) {
+        headers["X-Admin-Token"] = adminToken;
       }
       const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
       const data = await res.json().catch(() => ({}));
@@ -2581,7 +2735,11 @@
         return;
       }
       let wsUrl = API_BASE.replace(/^http/, "ws") + "/ws";
-      if (apiKey) wsUrl += `?api_key=${encodeURIComponent(apiKey)}`;
+      const wsParams = new URLSearchParams();
+      if (apiKey) wsParams.set("api_key", apiKey);
+      if (adminToken) wsParams.set("admin_token", adminToken);
+      const qs = wsParams.toString();
+      if (qs) wsUrl += `?${qs}`;
 
       try {
         ws = new WebSocket(wsUrl);
@@ -2837,11 +2995,163 @@
       if (e.key === "Escape") {
         mcpModal.classList.remove("open");
         keyModal.classList.remove("open");
+        adminModal.classList.remove("open");
         supportPanel.classList.remove("open");
         betModal.classList.remove("open");
         walletModal.classList.remove("open");
         cancelAuraCaptcha();
       }
+    });
+
+    // 👑 Admin Aura Mode Controller
+    const adminBtn = document.getElementById("admin-btn");
+    const adminModal = document.getElementById("admin-modal");
+    const adminClose = document.getElementById("admin-close");
+    const adminPassInput = document.getElementById("admin-pass-input");
+    const adminToggleVis = document.getElementById("admin-toggle-vis");
+    const adminFeedback = document.getElementById("admin-feedback");
+    const adminLoginSubmit = document.getElementById("admin-login-submit");
+    const adminLogoutBtn = document.getElementById("admin-logout-btn");
+    const nukeDoneBtn = document.getElementById("nuke-done-btn");
+    const nukeBetsBtn = document.getElementById("nuke-bets-btn");
+    const nukeAllBtn = document.getElementById("nuke-all-btn");
+    let nukeAllArmed = false;
+    let nukeArmTimer = null;
+
+    function applyAdminAura(active) {
+      isAdmin = Boolean(active);
+      document.documentElement.setAttribute("data-admin", isAdmin ? "true" : "false");
+      adminBtn.classList.toggle("active", isAdmin);
+      adminBtn.textContent = isAdmin ? "👑 AURA ADMIN" : "👑 Admin";
+    }
+
+    async function checkAdminStatus() {
+      try {
+        const headers = adminToken ? { "X-Admin-Token": adminToken } : {};
+        const res = await fetch(`${API_BASE}/api/admin/status`, { headers });
+        const data = await res.json().catch(() => ({}));
+        if (data.isAdmin) {
+          applyAdminAura(true);
+        } else {
+          if (adminToken) {
+            adminToken = "";
+            localStorage.removeItem("board.adminToken");
+          }
+          applyAdminAura(false);
+        }
+      } catch {
+        applyAdminAura(false);
+      }
+    }
+
+    adminBtn.addEventListener("click", () => {
+      if (isAdmin) {
+        document.getElementById("admin-dock").scrollIntoView({ behavior: "smooth", block: "nearest" });
+        showToast("👑 Admin Aura Mode is ACTIVE — Captcha bypassed!", "web");
+        return;
+      }
+      adminFeedback.textContent = "";
+      adminFeedback.className = "key-feedback";
+      adminPassInput.value = "";
+      adminModal.classList.add("open");
+      setTimeout(() => adminPassInput.focus(), 40);
+    });
+
+    adminClose.addEventListener("click", () => adminModal.classList.remove("open"));
+    adminModal.addEventListener("click", (e) => {
+      if (e.target === adminModal) adminModal.classList.remove("open");
+    });
+
+    adminToggleVis.addEventListener("click", () => {
+      const hidden = adminPassInput.type === "password";
+      adminPassInput.type = hidden ? "text" : "password";
+      adminToggleVis.textContent = hidden ? "Hide" : "Peek";
+    });
+
+    async function submitAdminLogin() {
+      const password = adminPassInput.value.trim();
+      if (!password) return;
+      adminLoginSubmit.disabled = true;
+      adminFeedback.className = "key-feedback";
+      adminFeedback.textContent = "Verifying royal aura...";
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.adminToken) {
+          adminToken = data.adminToken;
+          localStorage.setItem("board.adminToken", adminToken);
+          applyAdminAura(true);
+          adminModal.classList.remove("open");
+          reconnectWebSocket();
+          showToast("👑 ADMIN AURA MODE ACTIVATED! Captcha bypassed.", "web");
+        } else {
+          adminFeedback.className = "key-feedback err";
+          adminFeedback.textContent = data.error || "Wrong Admin Password!";
+        }
+      } catch (err) {
+        adminFeedback.className = "key-feedback err";
+        adminFeedback.textContent = err.message;
+      } finally {
+        adminLoginSubmit.disabled = false;
+      }
+    }
+
+    adminLoginSubmit.addEventListener("click", submitAdminLogin);
+    adminPassInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submitAdminLogin();
+    });
+
+    adminLogoutBtn.addEventListener("click", async () => {
+      try {
+        await api("/api/admin/logout", { method: "POST" });
+      } catch {}
+      adminToken = "";
+      localStorage.removeItem("board.adminToken");
+      applyAdminAura(false);
+      reconnectWebSocket();
+      showToast("Exited Admin Aura Mode", "web");
+    });
+
+    async function triggerNuke(scope) {
+      try {
+        const res = await api("/api/admin/nuke", {
+          method: "POST",
+          body: JSON.stringify({ scope }),
+        });
+        await fetchTodos();
+        await fetchWallet();
+        if (scope === "done") showToast(`🧹 Nuked ${res.deleted ?? 0} done card(s)!`, "web");
+        if (scope === "bets") showToast(`🎰 Refunded ${res.refundedCoins ?? 0} 🪙 across ${res.refundedBets ?? 0} bet(s)!`, "web");
+        if (scope === "all") showToast(`☢️ BOARD NUKED (${res.cardsDeleted ?? 0} cards wiped)!`, "web");
+      } catch (err) {
+        showError(`Nuke failed: ${err.message}`, false);
+      }
+    }
+
+    nukeDoneBtn.addEventListener("click", () => triggerNuke("done"));
+    nukeBetsBtn.addEventListener("click", () => triggerNuke("bets"));
+    nukeAllBtn.addEventListener("click", async () => {
+      if (!nukeAllArmed) {
+        nukeAllArmed = true;
+        nukeAllBtn.classList.add("armed");
+        nukeAllBtn.textContent = "☢️ CLICK AGAIN TO NUKE ALL";
+        clearTimeout(nukeArmTimer);
+        nukeArmTimer = setTimeout(() => {
+          nukeAllArmed = false;
+          nukeAllBtn.classList.remove("armed");
+          nukeAllBtn.textContent = "☢️ NUKE WHOLE BOARD";
+        }, 4000);
+        return;
+      }
+      clearTimeout(nukeArmTimer);
+      nukeAllArmed = false;
+      nukeAllBtn.classList.remove("armed");
+      nukeAllBtn.textContent = "☢️ NUKE WHOLE BOARD";
+      await triggerNuke("all");
     });
 
     // Adaptive Cloudflare Turnstile Controller
@@ -3365,6 +3675,7 @@
     updateKeyButton();
     updateWalletPill();
     render();
+    checkAdminStatus();
     verifyApiKey(false);
     fetchWallet();
     fetchTodos();

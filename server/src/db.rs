@@ -249,7 +249,12 @@ impl TodoDB {
                resolved_at INTEGER
              );
              CREATE INDEX IF NOT EXISTS idx_bets_card_status ON bets(card_id, status);
-             CREATE INDEX IF NOT EXISTS idx_bets_player ON bets(player_id, created_at DESC);",
+             CREATE INDEX IF NOT EXISTS idx_bets_player ON bets(player_id, created_at DESC);
+             CREATE TABLE IF NOT EXISTS admin_sessions (
+               token_hash TEXT PRIMARY KEY,
+               created_at INTEGER NOT NULL,
+               expires_at INTEGER NOT NULL
+             );",
         )
         .map_err(|e| e.to_string())?;
 
@@ -542,6 +547,76 @@ impl TodoDB {
             .execute("DELETE FROM todos WHERE status = 'done' OR done = 1", [])
             .map_err(|e| e.to_string())?;
         Ok(changes as i64)
+    }
+
+    pub fn create_admin_session(&self, token_hash: &str, ttl_ms: i64) -> Result<i64, String> {
+        let conn = self.conn.lock().unwrap();
+        let now = now_ms();
+        let expires_at = now + ttl_ms;
+        let _ = conn.execute("DELETE FROM admin_sessions WHERE expires_at <= ?", params![now]);
+        conn.execute(
+            "INSERT OR REPLACE INTO admin_sessions (token_hash, created_at, expires_at) VALUES (?, ?, ?)",
+            params![token_hash, now, expires_at],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(expires_at)
+    }
+
+    pub fn has_admin_session(&self, token_hash: &str) -> bool {
+        let conn = self.conn.lock().unwrap();
+        let now = now_ms();
+        let exp: Option<i64> = conn
+            .query_row(
+                "SELECT expires_at FROM admin_sessions WHERE token_hash = ?",
+                params![token_hash],
+                |r| r.get(0),
+            )
+            .optional()
+            .ok()
+            .flatten();
+        matches!(exp, Some(e) if e > now)
+    }
+
+    pub fn delete_admin_session(&self, token_hash: &str) {
+        let conn = self.conn.lock().unwrap();
+        let _ = conn.execute("DELETE FROM admin_sessions WHERE token_hash = ?", params![token_hash]);
+    }
+
+    pub fn nuke_bets(&self) -> Result<(i64, i64), String> {
+        let mut conn = self.conn.lock().unwrap();
+        let open_bets: Vec<(String, i64)> = {
+            let mut stmt = conn
+                .prepare("SELECT player_id, amount FROM bets WHERE status = 'open'")
+                .map_err(|e| e.to_string())?;
+            let rows = stmt
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+                .map_err(|e| e.to_string())?;
+            rows.flatten().collect()
+        };
+        let now = now_ms();
+        let mut refunded_coins = 0i64;
+        let refunded_count = open_bets.len() as i64;
+        let tx = conn.transaction().map_err(|e| e.to_string())?;
+        for (pid, amt) in open_bets {
+            refunded_coins += amt;
+            tx.execute(
+                "UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE player_id = ?",
+                params![amt, now, pid],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        tx.execute("DELETE FROM bets", []).map_err(|e| e.to_string())?;
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok((refunded_count, refunded_coins))
+    }
+
+    pub fn nuke_all(&self) -> Result<(i64, i64), String> {
+        let (refunded_bets, _) = self.nuke_bets()?;
+        let conn = self.conn.lock().unwrap();
+        let cards_deleted = conn
+            .execute("DELETE FROM todos", [])
+            .map_err(|e| e.to_string())? as i64;
+        Ok((cards_deleted, refunded_bets))
     }
 
     // --- Wallets & Prediction Gambling ---

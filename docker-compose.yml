@@ -9,6 +9,7 @@ services:
       WRITE_LIMIT_PER_MIN: ${WRITE_LIMIT_PER_MIN:-90}
       API_KEY: ${API_KEY:-}
       API_KEY_MODE: ${API_KEY_MODE:-writes}
+      ADMIN_KEY: ${ADMIN_KEY:-}
       TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
     volumes:
