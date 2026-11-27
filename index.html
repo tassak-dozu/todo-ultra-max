@@ -3074,6 +3074,161 @@
         inset 0 1.5px 0 rgba(255, 255, 255, 0.55),
         0 0 22px rgba(244, 114, 182, 0.32);
     }
+
+    /* === LOOTBOXES & LIVE CHAT EVENT STYLES === */
+    .lootbox-btn {
+      border-color: rgba(244, 114, 182, 0.5);
+      color: #f9a8d4;
+      background:
+        var(--lg-top-sheen),
+        linear-gradient(135deg, rgba(236, 72, 153, 0.24), rgba(12, 14, 30, 0.78) 55%, rgba(139, 92, 246, 0.26));
+    }
+
+    .modal-wide {
+      max-width: 680px;
+    }
+
+    .crate-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    @media (max-width: 600px) {
+      .crate-grid { grid-template-columns: 1fr; }
+    }
+
+    .crate-card {
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.20);
+      background: rgba(14, 18, 38, 0.72);
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+      transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+
+    html[data-theme="light"] .crate-card {
+      background: rgba(255, 255, 255, 0.85);
+      border-color: rgba(15, 23, 42, 0.12);
+    }
+
+    .crate-card:hover { transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.45); }
+
+    .crate-card.selected {
+      border-color: #f472b6;
+      box-shadow: 0 0 24px rgba(236, 72, 153, 0.32);
+      background: linear-gradient(145deg, rgba(139, 92, 246, 0.25), rgba(236, 72, 153, 0.20));
+    }
+
+    .crate-title { font-size: 0.86rem; font-weight: 800; margin-bottom: 4px; }
+    .crate-price { font-size: 0.78rem; color: #fbbf24; font-weight: 750; }
+    .crate-odds { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+
+    .loot-reel-viewport {
+      position: relative;
+      height: 118px;
+      border-radius: 14px;
+      overflow: hidden;
+      background: rgba(6, 9, 20, 0.86);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: inset 0 8px 28px rgba(0, 0, 0, 0.65);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+    }
+
+    .loot-needle {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      transform: translateX(-50%);
+      background: linear-gradient(180deg, #fde047, #f43f5e, #fde047);
+      box-shadow: 0 0 14px #fde047;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .loot-reel {
+      display: flex;
+      gap: 10px;
+      padding: 0 12px;
+      will-change: transform;
+    }
+
+    .loot-tile {
+      flex: 0 0 108px;
+      height: 92px;
+      border-radius: 12px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 4px;
+      background: rgba(20, 25, 48, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-bottom: 3px solid var(--rar-col, #94a3b8);
+    }
+
+    .loot-tile-icon { font-size: 1.5rem; line-height: 1; }
+    .loot-tile-name { font-size: 0.64rem; font-weight: 750; line-height: 1.2; color: #f8fafc; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+    .rar-common { --rar-col: #94a3b8; }
+    .rar-rare { --rar-col: #38bdf8; }
+    .rar-epic { --rar-col: #c084fc; }
+    .rar-legendary { --rar-col: #fbbf24; }
+    .rar-mythic { --rar-col: #f43f5e; }
+
+    .loot-reveal {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 12px 14px;
+      border-radius: 13px;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.22), rgba(15, 23, 42, 0.88), rgba(34, 211, 238, 0.16));
+      border: 1px solid var(--rar-col, #a78bfa);
+      box-shadow: 0 0 28px rgba(139, 92, 246, 0.25);
+      animation: modalPop 0.24s ease both;
+    }
+
+    .loot-reveal.open { display: flex; }
+
+    .loot-inv-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 10px;
+      background: var(--input-bg);
+      border-left: 3px solid var(--rar-col, #94a3b8);
+      font-size: 0.76rem;
+    }
+
+    .sup-msg.event {
+      align-self: stretch;
+      max-width: 100%;
+      font-size: 0.74rem;
+      padding: 6px 10px;
+      border-radius: 9px;
+      background: rgba(139, 92, 246, 0.16);
+      border: 1px solid rgba(139, 92, 246, 0.34);
+      color: #e9d5ff;
+    }
+
+    html[data-theme="light"] .sup-msg.event {
+      background: rgba(139, 92, 246, 0.10);
+      color: #4c1d95;
+    }
   </style>
 </head>
 <body>
@@ -3146,6 +3301,7 @@
           <button type="button" class="seg-btn" data-view="list" role="tab">List</button>
         </div>
         <button type="button" class="ghost-btn user-btn" id="username-btn" title="Set your display username">🪪 <span id="username-pill-text">Set Name</span></button>
+        <button type="button" class="ghost-btn lootbox-btn" id="lootbox-btn" title="Crack Lootboxes for Coins, Cursor Skins & Roasts">🎁 Crates</button>
         <button type="button" class="ghost-btn wallet-btn mono" id="wallet-btn" title="Aura Coins & Degenerate Leaderboard">🪙 1,000</button>
         <button type="button" class="ghost-btn admin-btn" id="admin-btn" title="Admin Aura Mode">👑 Admin</button>
         <button type="button" class="ghost-btn key-btn" id="key-btn">🔑 API Key</button>
@@ -3372,26 +3528,26 @@
   <!-- Floating Live Event Toasts -->
   <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
 
-  <!-- Live Support Widget -->
-  <section class="support-panel" id="support-panel" aria-label="Live support chat">
+  <!-- Live Support & Room Event Chat Widget -->
+  <section class="support-panel" id="support-panel" aria-label="Live room chat and events">
     <div class="support-head">
       <div class="support-agent">
-        <div class="support-avatar">🎧</div>
+        <div class="support-avatar">💬</div>
         <div>
-          <div class="support-name">Agent Kevin (100% Real Human)</div>
-          <div class="support-sub"><span class="pulse-dot" style="background:var(--ok)"></span>Online · IQ 4000</div>
+          <div class="support-name">Room Chat &amp; Live Events</div>
+          <div class="support-sub"><span class="pulse-dot" style="background:var(--ok)"></span>Live drops, bets &amp; Agent Kevin</div>
         </div>
       </div>
-      <button type="button" class="icon-btn" id="support-close" aria-label="Close support">&times;</button>
+      <button type="button" class="icon-btn" id="support-close" aria-label="Close chat">&times;</button>
     </div>
     <div class="support-msgs" id="support-msgs"></div>
     <form class="support-form" id="support-form">
-      <input type="text" id="support-input" placeholder="Describe your crisis..." autocomplete="off" />
-      <button type="submit" class="add-btn" style="padding:7px 12px;font-size:0.78rem">Ask</button>
+      <input type="text" id="support-input" placeholder="Chat with the room or ask Kevin..." autocomplete="off" />
+      <button type="submit" class="add-btn" style="padding:7px 12px;font-size:0.78rem">Send</button>
     </form>
     <div class="support-foot">
-      <span>⭐ 5.0/5 (mandatory)</span>
-      <button type="button" class="icon-btn" id="support-more" style="font-size:0.72rem">🎲 More Wisdom</button>
+      <span>⚡ Events type in live</span>
+      <button type="button" class="icon-btn" id="support-more" style="font-size:0.72rem">🎲 Kevin Wisdom</button>
     </div>
   </section>
 
@@ -3400,9 +3556,9 @@
     <span>Made with 100% AI™</span>
   </button>
 
-  <button type="button" class="support-fab" id="support-fab" aria-label="Open live support">
+  <button type="button" class="support-fab" id="support-fab" aria-label="Open live chat">
     <span class="pulse-dot" style="background:var(--ok);box-shadow:0 0 10px var(--ok)"></span>
-    <span>💬 Live Support</span>
+    <span>💬 Live Chat</span>
     <span class="support-badge" id="support-badge">1</span>
   </button>
 
@@ -3496,6 +3652,51 @@
     </div>
   </div>
 
+  <!-- Lootbox Unboxer Modal -->
+  <div class="modal-backdrop" id="lootbox-modal" role="dialog" aria-modal="true" aria-labelledby="lootbox-title">
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <h2 id="lootbox-title">🎁 Liquid Glass Lootboxes</h2>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="stat-chip mono" id="lootbox-bal" style="color:#fbbf24">1,000 🪙</span>
+          <button type="button" class="icon-btn" id="lootbox-close">&times;</button>
+        </div>
+      </div>
+      <div class="crate-grid" id="crate-grid">
+        <button type="button" class="crate-card selected" data-crate="standard">
+          <div class="crate-title">📦 Standard Crate</div>
+          <div class="crate-price mono">100 🪙</div>
+          <div class="crate-odds">Common · Roasts · Small Jackpots</div>
+        </button>
+        <button type="button" class="crate-card" data-crate="glass">
+          <div class="crate-title">💎 Liquid Glass Case</div>
+          <div class="crate-price mono">350 🪙</div>
+          <div class="crate-odds">High Rare/Epic · Cursor Skins</div>
+        </button>
+        <button type="button" class="crate-card" data-crate="aura">
+          <div class="crate-title">👑 Aura Relic Chest</div>
+          <div class="crate-price mono">1,000 🪙</div>
+          <div class="crate-odds">Guaranteed Rare+ · Mythic Odds</div>
+        </button>
+      </div>
+      <div class="loot-reel-viewport">
+        <div class="loot-needle"></div>
+        <div class="loot-reel" id="loot-reel"></div>
+      </div>
+      <div class="loot-reveal" id="loot-reveal"></div>
+      <div class="key-feedback" id="lootbox-feedback"></div>
+      <div class="modal-foot" style="justify-content:space-between">
+        <span class="stat-chip" id="loot-equipped-summary" style="font-size:0.72rem">Equipped: Default Arrow</span>
+        <button type="button" class="add-btn" id="lootbox-open-btn">Crack Crate 🎁</button>
+      </div>
+      <div class="activity-head" style="margin-top:14px">
+        <span>🎒 Your Stash &amp; Flexes</span>
+        <button type="button" class="icon-btn" id="loot-unequip-btn" style="font-size:0.72rem">Reset Flex</button>
+      </div>
+      <div class="mini-list" id="loot-inventory-list" style="max-height:175px"></div>
+    </div>
+  </div>
+
   <!-- Set Username Modal -->
   <div class="modal-backdrop" id="username-modal" role="dialog" aria-modal="true" aria-labelledby="username-title">
     <div class="modal">
@@ -3558,6 +3759,9 @@
     let myBets = [];
     let markets = {};
     let leaderboard = [];
+    let lootInventory = [];
+    let lootPool = [];
+    let playerLoadout = { cursorSkin: null, title: null };
     let activeBetCardId = null;
     let selectedBucket = "speedrun";
 
@@ -4409,6 +4613,8 @@
       if (apiKey) wsParams.set("api_key", apiKey);
       if (adminToken) wsParams.set("admin_token", adminToken);
       if (playerName) wsParams.set("name", playerName);
+      if (playerLoadout.cursorSkin) wsParams.set("cursor_skin", playerLoadout.cursorSkin);
+      if (playerLoadout.title) wsParams.set("title", playerLoadout.title);
       const qs = wsParams.toString();
       if (qs) wsUrl += `?${qs}`;
 
@@ -4444,6 +4650,10 @@
             if (window.handleRemoteCursor) window.handleRemoteCursor(msg);
             return;
           }
+          if (msg.type === "chat") {
+            if (window.handleRoomChat) window.handleRoomChat(msg);
+            return;
+          }
           if (typeof msg.online === "number") onlineCount = msg.online;
           if (Array.isArray(msg.peers)) peers = msg.peers;
           if (typeof msg.typingCount === "number") typingCount = msg.typingCount;
@@ -4472,6 +4682,7 @@
               if (pendingMutations === 0 || msg.resolution) {
                 showToast(msg.lastEvent.summary, msg.lastEvent.source);
               }
+              if (window.typeEventToChat) window.typeEventToChat(msg.lastEvent.summary);
             }
             if (pendingMutations === 0) {
               todos = msg.todos.map(normalizeTodo);
@@ -4677,6 +4888,7 @@
         betModal.classList.remove("open");
         walletModal.classList.remove("open");
         usernameModal.classList.remove("open");
+        lootboxModal.classList.remove("open");
         cancelAuraCaptcha();
       }
     });
@@ -5379,19 +5591,59 @@
       return words.join(" ");
     }
 
+    let unreadChatCount = 0;
+
     function appendSupportMsg(text, who = "bot") {
       const div = document.createElement("div");
       div.className = `sup-msg ${who}`;
       div.textContent = text;
       supportMsgs.appendChild(div);
+      while (supportMsgs.children.length > 60) {
+        supportMsgs.firstElementChild.remove();
+      }
       supportMsgs.scrollTop = supportMsgs.scrollHeight;
       return div;
     }
 
+    function bumpChatBadge() {
+      if (supportPanel.classList.contains("open")) {
+        unreadChatCount = 0;
+        supportBadge.style.display = "none";
+      } else {
+        unreadChatCount++;
+        supportBadge.textContent = unreadChatCount > 99 ? "99+" : String(unreadChatCount);
+        supportBadge.style.display = "grid";
+      }
+    }
+
+    window.typeEventToChat = (summary) => {
+      const text = String(summary || "").trim();
+      if (!text) return;
+      const div = appendSupportMsg("", "event");
+      let i = 0;
+      const iv = setInterval(() => {
+        i = Math.min(text.length, i + 3);
+        div.textContent = text.slice(0, i);
+        supportMsgs.scrollTop = supportMsgs.scrollHeight;
+        if (i >= text.length) clearInterval(iv);
+      }, 14);
+      bumpChatBadge();
+    };
+
+    window.handleRoomChat = (msg) => {
+      if (!msg || !msg.text) return;
+      if (msg.peerId && msg.peerId === myPeerId) return;
+      const prefix = msg.isAdmin ? "👑 " : "";
+      const titleTag = msg.title ? `[${msg.title}] ` : "";
+      const line = `${prefix}${titleTag}${msg.name || "Anon"}: ${msg.text}`;
+      appendSupportMsg(line, "bot");
+      bumpChatBadge();
+    };
+
     function spitGarbageReply() {
       const typingEl = appendSupportMsg("Agent Kevin is aggressively typing...", "bot");
       setTimeout(() => {
-        typingEl.textContent = generateGarbageEnglish();
+        typingEl.textContent = `🎧 Kevin: ${generateGarbageEnglish()}`;
         supportMsgs.scrollTop = supportMsgs.scrollHeight;
       }, 320);
     }
@@ -5399,9 +5651,15 @@
     supportFab.addEventListener("click", () => {
       const opening = !supportPanel.classList.contains("open");
       supportPanel.classList.toggle("open");
-      supportBadge.style.display = "none";
       if (opening) {
-        spitGarbageReply();
+        unreadChatCount = 0;
+        supportBadge.style.display = "none";
+        if (supportMsgs.children.length === 0) {
+          for (const ev of activity.slice(0, 6).reverse()) {
+            appendSupportMsg(ev.summary, "event");
+          }
+          spitGarbageReply();
+        }
         setTimeout(() => supportInput.focus(), 80);
       }
     });
@@ -5412,11 +5670,245 @@
     supportForm.addEventListener("submit", (e) => {
       e.preventDefault();
       const q = supportInput.value.trim();
-      if (q) {
-        appendSupportMsg(q, "user");
-        supportInput.value = "";
+      if (!q) return;
+      appendSupportMsg(`${playerName}: ${q}`, "user");
+      supportInput.value = "";
+      sendWs({ type: "chat", text: q, name: playerName });
+      if (/kevin|help|\?/i.test(q)) {
+        spitGarbageReply();
       }
-      spitGarbageReply();
+    });
+
+    // === LIQUID GLASS LOOTBOXES & CS:GO REEL SPINNER ===
+    const lootboxBtn = document.getElementById("lootbox-btn");
+    const lootboxModal = document.getElementById("lootbox-modal");
+    const lootboxClose = document.getElementById("lootbox-close");
+    const lootboxBalEl = document.getElementById("lootbox-bal");
+    const crateGrid = document.getElementById("crate-grid");
+    const lootReel = document.getElementById("loot-reel");
+    const lootReveal = document.getElementById("loot-reveal");
+    const lootboxFeedback = document.getElementById("lootbox-feedback");
+    const lootOpenBtn = document.getElementById("lootbox-open-btn");
+    const lootInvList = document.getElementById("loot-inventory-list");
+    const lootEquippedSummary = document.getElementById("loot-equipped-summary");
+    const lootUnequipBtn = document.getElementById("loot-unequip-btn");
+    let selectedCrateId = "standard";
+    let spinningLoot = false;
+
+    const FALLBACK_POOL = [
+      { key: "coins_50", name: "Pocket Lint (+50 🪙)", icon: "🪙", rarity: "common", kind: "coins" },
+      { key: "roast_ratio", name: "Skill Issue (-0 🪙, +1 Ratio)", icon: "💀", rarity: "common", kind: "roast" },
+      { key: "roast_grass", name: "Touch Grass Permit: REVOKED", icon: "🌿", rarity: "common", kind: "roast" },
+      { key: "cursor_bolt", name: "Cursor: Cyber Lightning", icon: "⚡", rarity: "rare", kind: "cursor" },
+      { key: "cursor_crown", name: "Cursor: Sovereign Crown", icon: "👑", rarity: "legendary", kind: "cursor" },
+      { key: "coins_5000", name: "RUGPULL JACKPOT (+5,000 🪙)", icon: "🤑", rarity: "mythic", kind: "coins" },
+    ];
+
+    function buildReelTile(item) {
+      const el = document.createElement("div");
+      el.className = `loot-tile rar-${item.rarity || "common"}`;
+      el.innerHTML = `<span class="loot-tile-icon">${item.icon || "🎁"}</span><span class="loot-tile-name"></span>`;
+      el.querySelector(".loot-tile-name").textContent = item.name;
+      return el;
+    }
+
+    function seedLootReel(pool) {
+      if (!lootReel) return;
+      const src = pool && pool.length > 0 ? pool : FALLBACK_POOL;
+      lootReel.style.transition = "none";
+      lootReel.style.transform = "translateX(0px)";
+      lootReel.innerHTML = "";
+      for (let i = 0; i < 44; i++) {
+        lootReel.appendChild(buildReelTile(src[i % src.length]));
+      }
+    }
+
+    function syncCosmeticsWs() {
+      sendWs({
+        type: "set_cosmetic",
+        cursorSkin: playerLoadout.cursorSkin || "",
+        title: playerLoadout.title || "",
+      });
+    }
+
+    async function fetchLootboxes() {
+      try {
+        const data = await api(
+          `/api/lootboxes?playerId=${encodeURIComponent(playerId)}&name=${encodeURIComponent(playerName)}`
+        );
+        if (data.wallet) wallet = data.wallet;
+        if (Array.isArray(data.inventory)) lootInventory = data.inventory;
+        if (data.loadout) playerLoadout = data.loadout;
+        if (Array.isArray(data.pool) && data.pool.length > 0) lootPool = data.pool;
+        updateWalletPill();
+        syncCosmeticsWs();
+        renderLootboxModal();
+      } catch {}
+    }
+
+    async function equipLootItem(itemId, clearSlot = null) {
+      try {
+        const data = await api("/api/lootboxes/equip", {
+          method: "POST",
+          body: JSON.stringify({ playerId, itemId, clear: clearSlot }),
+        });
+        if (data.loadout) playerLoadout = data.loadout;
+        syncCosmeticsWs();
+        renderLootboxModal();
+        showToast("✨ Cosmetics equipped live!", "web");
+      } catch (err) {
+        lootboxFeedback.className = "key-feedback err";
+        lootboxFeedback.textContent = err.message;
+      }
+    }
+
+    function renderLootboxModal() {
+      if (lootboxBalEl) lootboxBalEl.textContent = `${wallet.balance.toLocaleString()} 🪙`;
+      if (lootEquippedSummary) {
+        const parts = [];
+        if (playerLoadout.cursorSkin) parts.push(`Cursor: ${playerLoadout.cursorSkin}`);
+        if (playerLoadout.title) parts.push(`Title: [${playerLoadout.title}]`);
+        lootEquippedSummary.textContent = parts.length > 0 ? `Equipped: ${parts.join(" · ")}` : "Equipped: Default Arrow";
+      }
+      if (!lootInvList) return;
+      lootInvList.innerHTML = "";
+      if (lootInventory.length === 0) {
+        const d = document.createElement("div");
+        d.className = "mini-row";
+        d.textContent = "Your stash is empty — crack a crate above!";
+        lootInvList.appendChild(d);
+        return;
+      }
+      for (const item of lootInventory) {
+        const row = document.createElement("div");
+        row.className = `loot-inv-item rar-${item.rarity}`;
+        const left = document.createElement("span");
+        left.textContent = `${item.icon} ${item.name} (${item.rarity.toUpperCase()})`;
+        row.appendChild(left);
+
+        if (item.kind === "cursor" || item.kind === "title") {
+          const isEquipped =
+            (item.kind === "cursor" && playerLoadout.cursorSkin === item.value) ||
+            (item.kind === "title" && playerLoadout.title === item.value);
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "ghost-btn";
+          btn.style.padding = "3px 9px";
+          btn.style.fontSize = "0.7rem";
+          btn.textContent = isEquipped ? "Equipped ✓" : "Equip";
+          btn.disabled = isEquipped;
+          btn.addEventListener("click", () => equipLootItem(item.id));
+          row.appendChild(btn);
+        }
+        lootInvList.appendChild(row);
+      }
+    }
+
+    crateGrid.querySelectorAll(".crate-card").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (spinningLoot) return;
+        selectedCrateId = btn.dataset.crate;
+        crateGrid.querySelectorAll(".crate-card").forEach((b) => b.classList.toggle("selected", b === btn));
+      });
+    });
+
+    lootboxBtn.addEventListener("click", async () => {
+      lootboxFeedback.textContent = "";
+      lootReveal.classList.remove("open");
+      lootboxModal.classList.add("open");
+      await fetchLootboxes();
+      if (lootReel.children.length === 0) seedLootReel(lootPool);
+    });
+    lootboxClose.addEventListener("click", () => {
+      if (!spinningLoot) lootboxModal.classList.remove("open");
+    });
+    lootboxModal.addEventListener("click", (e) => {
+      if (e.target === lootboxModal && !spinningLoot) lootboxModal.classList.remove("open");
+    });
+
+    lootUnequipBtn.addEventListener("click", async () => {
+      await equipLootItem(null, "cursor");
+      await equipLootItem(null, "title");
+    });
+
+    lootOpenBtn.addEventListener("click", async () => {
+      if (spinningLoot) return;
+      spinningLoot = true;
+      lootOpenBtn.disabled = true;
+      lootboxFeedback.className = "key-feedback";
+      lootboxFeedback.textContent = "Rolling server RNG...";
+      lootReveal.classList.remove("open");
+
+      try {
+        const res = await api("/api/lootboxes/open", {
+          method: "POST",
+          body: JSON.stringify({
+            playerId,
+            playerName,
+            crateId: selectedCrateId,
+          }),
+        });
+        const drop = res.drop;
+        if (res.wallet) wallet = res.wallet;
+        if (Array.isArray(res.inventory)) lootInventory = res.inventory;
+        if (res.loadout) playerLoadout = res.loadout;
+        updateWalletPill();
+        if (lootboxBalEl) lootboxBalEl.textContent = `${wallet.balance.toLocaleString()} 🪙`;
+
+        const src = lootPool.length > 0 ? lootPool : FALLBACK_POOL;
+        const winIdx = 35;
+        lootReel.style.transition = "none";
+        lootReel.style.transform = "translateX(0px)";
+        lootReel.innerHTML = "";
+        for (let i = 0; i < 44; i++) {
+          const item = i === winIdx ? drop : src[Math.floor(Math.random() * src.length)];
+          lootReel.appendChild(buildReelTile(item));
+        }
+
+        lootboxFeedback.textContent = "Opening case...";
+        void lootReel.offsetWidth;
+
+        const viewportW = lootReel.parentElement.clientWidth || 600;
+        const tileStride = 118; // 108px tile + 10px gap
+        const jitter = (Math.random() - 0.5) * 44;
+        const targetX = -(winIdx * tileStride + 54 + 12 - viewportW / 2 + jitter);
+
+        lootReel.style.transition = "transform 3.4s cubic-bezier(0.08, 0.90, 0.14, 1)";
+        lootReel.style.transform = `translateX(${targetX.toFixed(1)}px)`;
+
+        setTimeout(() => {
+          spinningLoot = false;
+          lootOpenBtn.disabled = false;
+          lootboxFeedback.textContent = "";
+          renderLootboxModal();
+
+          lootReveal.className = `loot-reveal open rar-${drop.rarity}`;
+          lootReveal.innerHTML = "";
+          const info = document.createElement("div");
+          info.innerHTML = `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--rar-col);font-weight:800">${drop.rarity} UNBOXED!</div><div style="font-size:1rem;font-weight:850">${drop.icon} ${drop.name}</div>`;
+          lootReveal.appendChild(info);
+
+          if (drop.kind === "cursor" || drop.kind === "title") {
+            const eqBtn = document.createElement("button");
+            eqBtn.type = "button";
+            eqBtn.className = "add-btn";
+            eqBtn.textContent = "Equip Now ⚡";
+            eqBtn.addEventListener("click", async () => {
+              await equipLootItem(drop.id);
+              eqBtn.disabled = true;
+              eqBtn.textContent = "Equipped ✓";
+            });
+            lootReveal.appendChild(eqBtn);
+          }
+
+          burstAtEl(lootReveal, drop.rarity === "mythic" || drop.rarity === "legendary" ? 38 : 20);
+        }, 3500);
+      } catch (err) {
+        spinningLoot = false;
+        lootOpenBtn.disabled = false;
+        lootboxFeedback.className = "key-feedback err";
+        lootboxFeedback.textContent = err.message;
+      }
     });
 
     document.addEventListener("visibilitychange", () => {
@@ -5433,6 +5925,7 @@
     checkAdminStatus();
     verifyApiKey(false);
     fetchWallet();
+    fetchLootboxes();
     fetchTodos();
     connectWebSocket();
 
@@ -5598,6 +6091,27 @@
         }
       }
 
+      const CURSOR_PATHS = {
+        arrow: "M4 3 L19 11 L12 13.5 L9.5 20.5 Z",
+        bolt: "M13 2 L4 14 H11 L9 22 L20 10 H13 Z",
+        flame: "M12 2 C15 6 19 9 19 14 A7 7 0 1 1 5 14 C5 10 8 8 9 6 C9 9 11 10 12 2 Z",
+        diamond: "M12 2 L21 10 L12 22 L3 10 Z",
+        crown: "M3 18 L5 8 L10 13 L12 5 L14 13 L19 8 L21 18 Z",
+        ufo: "M4 13 C4 9 8 7 12 7 C16 7 20 9 20 13 L22 15 H2 L4 13 Z M8 15 L6 20 M16 15 L18 20",
+        scythe: "M5 4 C14 2 20 7 21 15 C16 11 12 10 8 11 L8 22 H5 Z",
+      };
+
+      function cursorPathFor(skin) {
+        return CURSOR_PATHS[skin] || CURSOR_PATHS.arrow;
+      }
+
+      function cursorLabelFor(msg) {
+        const crown = msg.isAdmin ? "👑 " : "";
+        const title = msg.title ? `[${msg.title}] ` : "";
+        const name = msg.isAdmin ? (msg.name || "ADMIN") : (msg.name || `User#${String(msg.peerId).slice(0, 4)}`);
+        return `${crown}${title}${name}`;
+      }
+
       function createRemoteCursorNode(msg) {
         const el = document.createElement("div");
         el.className = "remote-cursor";
@@ -5605,7 +6119,7 @@
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         svg.setAttribute("viewBox", "0 0 24 24");
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", "M4 3 L19 11 L12 13.5 L9.5 20.5 Z");
+        path.setAttribute("d", cursorPathFor(msg.cursorSkin));
         path.setAttribute("fill", color);
         path.setAttribute("stroke", "#ffffff");
         path.setAttribute("stroke-width", "1.6");
@@ -5615,11 +6129,11 @@
         const tag = document.createElement("span");
         tag.className = "remote-cursor-tag";
         tag.style.background = color;
-        tag.textContent = msg.isAdmin ? `👑 ${msg.name || "ADMIN"}` : (msg.name || `User#${String(msg.peerId).slice(0, 4)}`);
+        tag.textContent = cursorLabelFor(msg);
 
         el.append(svg, tag);
         cursorsLayer.appendChild(el);
-        return { el, path, tag, color };
+        return { el, path, tag, color, skin: msg.cursorSkin || "arrow" };
       }
 
       window.handleRemoteCursor = (msg) => {
@@ -5638,7 +6152,6 @@
             y,
             tx: x,
             ty: y,
-            color,
             lastSeen: performance.now(),
             ...dom,
           };
@@ -5649,7 +6162,12 @@
             peer.path.setAttribute("fill", color);
             peer.tag.style.background = color;
           }
-          const nextLabel = msg.isAdmin ? `👑 ${msg.name || "ADMIN"}` : (msg.name || `User#${String(msg.peerId).slice(0, 4)}`);
+          const nextSkin = msg.cursorSkin || "arrow";
+          if (peer.skin !== nextSkin) {
+            peer.skin = nextSkin;
+            peer.path.setAttribute("d", cursorPathFor(nextSkin));
+          }
+          const nextLabel = cursorLabelFor(msg);
           if (peer.tag.textContent !== nextLabel) peer.tag.textContent = nextLabel;
           peer.tx = x;
           peer.ty = y;

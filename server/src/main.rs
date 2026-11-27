@@ -31,7 +31,7 @@ use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
 use crate::captcha::TurnstileGate;
-use crate::db::{bucket_label, now_ms, ResolutionSummary, TodoDB};
+use crate::db::{bucket_label, now_ms, ResolutionSummary, TodoDB, LOOT_POOL};
 use crate::mcp::handle_mcp_payload;
 
 const PEER_COLORS: [&str; 7] = [
@@ -57,6 +57,10 @@ struct PeerState {
     color: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cursor_skin: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    title: Option<String>,
     typing: bool,
     dragging_id: Option<String>,
     is_admin: bool,
@@ -370,6 +374,27 @@ struct KeyQuery {
     api_key: Option<String>,
     admin_token: Option<String>,
     name: Option<String>,
+    cursor_skin: Option<String>,
+    title: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct OpenLootboxBody {
+    #[serde(rename = "playerId")]
+    player_id: Option<String>,
+    #[serde(rename = "playerName")]
+    player_name: Option<String>,
+    #[serde(rename = "crateId")]
+    crate_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct EquipLootBody {
+    #[serde(rename = "playerId")]
+    player_id: Option<String>,
+    #[serde(rename = "itemId")]
+    item_id: Option<String>,
+    clear: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -1031,6 +1056,121 @@ async fn place_bet(
     }
 }
 
+async fn get_lootboxes(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<WalletQuery>,
+) -> Response {
+    if !st.authorize(&headers, q.api_key.as_deref(), false) {
+        return json_resp(StatusCode::UNAUTHORIZED, json!({ "error": "API key required" }));
+    }
+    let Some(pid) = q.player_id.as_deref() else {
+        return json_resp(StatusCode::BAD_REQUEST, json!({ "error": "playerId required" }));
+    };
+    match st.db.get_loot_state(pid, q.name.as_deref()) {
+        Ok((wallet, inventory, loadout)) => {
+            let pool: Vec<Value> = LOOT_POOL
+                .iter()
+                .map(|i| {
+                    json!({
+                        "key": i.key,
+                        "name": i.name,
+                        "icon": i.icon,
+                        "rarity": i.rarity,
+                        "kind": i.kind,
+                        "value": i.value,
+                        "coinBonus": i.coin_bonus,
+                    })
+                })
+                .collect();
+            json_resp(
+                StatusCode::OK,
+                json!({
+                    "wallet": wallet,
+                    "inventory": inventory,
+                    "loadout": loadout,
+                    "pool": pool
+                }),
+            )
+        }
+        Err(msg) => json_resp(StatusCode::BAD_REQUEST, json!({ "error": msg })),
+    }
+}
+
+async fn open_lootbox_handler(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<KeyQuery>,
+    Json(body): Json<OpenLootboxBody>,
+) -> Response {
+    if !st.authorize(&headers, q.api_key.as_deref(), true) {
+        return json_resp(StatusCode::UNAUTHORIZED, json!({ "error": "API key required" }));
+    }
+    let ip = st.client_ip(&headers);
+    if !st.check_rate_limit(&ip) {
+        return json_resp(
+            StatusCode::TOO_MANY_REQUESTS,
+            json!({ "error": "Chill out, rate limit hit" }),
+        );
+    }
+    let (Some(pid), Some(crate_id)) = (body.player_id.as_deref(), body.crate_id.as_deref()) else {
+        return json_resp(
+            StatusCode::BAD_REQUEST,
+            json!({ "error": "Required: playerId, crateId" }),
+        );
+    };
+
+    match st.db.open_lootbox(pid, body.player_name.as_deref(), crate_id) {
+        Ok((wallet, drop, inventory, loadout, crate_name)) => {
+            let tag = drop.rarity.to_uppercase();
+            let summary = if drop.kind == "roast" {
+                format!(
+                    "🤡 {} opened {crate_name} and got roasted: {} {}",
+                    wallet.name, drop.icon, drop.name
+                )
+            } else {
+                format!(
+                    "🎁 {} opened {crate_name} and got {} {} [{tag}]!",
+                    wallet.name, drop.icon, drop.name
+                )
+            };
+            let ev = st.record_activity("bet", "web", summary, None);
+            st.broadcast_sync(Some(&ev), None);
+            json_resp(
+                StatusCode::OK,
+                json!({
+                    "wallet": wallet,
+                    "drop": drop,
+                    "inventory": inventory,
+                    "loadout": loadout
+                }),
+            )
+        }
+        Err(msg) => json_resp(StatusCode::BAD_REQUEST, json!({ "error": msg })),
+    }
+}
+
+async fn equip_loot_handler(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<KeyQuery>,
+    Json(body): Json<EquipLootBody>,
+) -> Response {
+    if !st.authorize(&headers, q.api_key.as_deref(), true) {
+        return json_resp(StatusCode::UNAUTHORIZED, json!({ "error": "API key required" }));
+    }
+    let Some(pid) = body.player_id.as_deref() else {
+        return json_resp(StatusCode::BAD_REQUEST, json!({ "error": "playerId required" }));
+    };
+    match st
+        .db
+        .equip_loot(pid, body.item_id.as_deref(), body.clear.as_deref())
+    {
+        Ok(loadout) => json_resp(StatusCode::OK, json!({ "loadout": loadout })),
+        Err(msg) => json_resp(StatusCode::BAD_REQUEST, json!({ "error": msg })),
+    }
+}
+
 async fn mcp_get(State(st): State<Arc<AppState>>) -> Response {
     json_resp(
         StatusCode::OK,
@@ -1169,7 +1309,19 @@ async fn ws_handler(
         .as_deref()
         .map(|n| n.trim().chars().take(24).collect())
         .filter(|n: &String| !n.is_empty());
-    ws.on_upgrade(move |socket| handle_socket(socket, st, is_admin, initial_name))
+    let initial_skin: Option<String> = q
+        .cursor_skin
+        .as_deref()
+        .map(|s| s.trim().chars().take(20).collect())
+        .filter(|s: &String| !s.is_empty());
+    let initial_title: Option<String> = q
+        .title
+        .as_deref()
+        .map(|s| s.trim().chars().take(24).collect())
+        .filter(|s: &String| !s.is_empty());
+    ws.on_upgrade(move |socket| {
+        handle_socket(socket, st, is_admin, initial_name, initial_skin, initial_title)
+    })
 }
 
 async fn handle_socket(
@@ -1177,6 +1329,8 @@ async fn handle_socket(
     st: Arc<AppState>,
     is_admin: bool,
     initial_name: Option<String>,
+    initial_skin: Option<String>,
+    initial_title: Option<String>,
 ) {
     let peer_id = Uuid::new_v4().to_string()[..8].to_string();
     let color = {
@@ -1192,6 +1346,8 @@ async fn handle_socket(
                 id: peer_id.clone(),
                 color: color.clone(),
                 name: initial_name,
+                cursor_skin: initial_skin,
+                title: initial_title,
                 typing: false,
                 dragging_id: None,
                 is_admin,
@@ -1271,6 +1427,64 @@ async fn handle_socket(
                                 st_recv.broadcast_presence();
                             }
                         }
+                        Some("chat") => {
+                            let msg_text: String = val
+                                .get("text")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.trim().chars().take(240).collect())
+                                .unwrap_or_default();
+                            if !msg_text.is_empty() {
+                                let incoming_name: Option<String> = val
+                                    .get("name")
+                                    .and_then(|v| v.as_str())
+                                    .map(|n| n.trim().chars().take(24).collect())
+                                    .filter(|n: &String| !n.is_empty());
+                                let (stored_name, stored_title) = {
+                                    let peers = st_recv.peers.lock().unwrap();
+                                    peers
+                                        .get(&pid_recv)
+                                        .map(|p| (p.name.clone(), p.title.clone()))
+                                        .unwrap_or((None, None))
+                                };
+                                let sender_name = incoming_name
+                                    .or(stored_name)
+                                    .unwrap_or_else(|| format!("User#{}", &pid_recv[..4.min(pid_recv.len())]));
+                                let payload = json!({
+                                    "type": "chat",
+                                    "peerId": pid_recv,
+                                    "name": sender_name,
+                                    "title": stored_title,
+                                    "color": color_recv,
+                                    "isAdmin": is_admin,
+                                    "text": msg_text,
+                                    "at": now_ms()
+                                });
+                                let _ = st_recv.tx.send(payload.to_string());
+                            }
+                        }
+                        Some("set_cosmetic") => {
+                            let next_skin: Option<String> = val
+                                .get("cursorSkin")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.trim().chars().take(20).collect())
+                                .filter(|s: &String| !s.is_empty());
+                            let next_title: Option<String> = val
+                                .get("title")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.trim().chars().take(24).collect())
+                                .filter(|s: &String| !s.is_empty());
+                            let mut changed = false;
+                            if let Some(p) = st_recv.peers.lock().unwrap().get_mut(&pid_recv) {
+                                if p.cursor_skin != next_skin || p.title != next_title {
+                                    p.cursor_skin = next_skin;
+                                    p.title = next_title;
+                                    changed = true;
+                                }
+                            }
+                            if changed {
+                                st_recv.broadcast_presence();
+                            }
+                        }
                         Some("cursor") => {
                             let x = val.get("x").and_then(|v| v.as_f64());
                             let y = val.get("y").and_then(|v| v.as_f64());
@@ -1286,20 +1500,22 @@ async fn handle_socket(
                                         .and_then(|v| v.as_str())
                                         .map(|n| n.trim().chars().take(24).collect())
                                         .filter(|n: &String| !n.is_empty());
-                                    let name = incoming_name.or_else(|| {
-                                        st_recv
-                                            .peers
-                                            .lock()
-                                            .unwrap()
+                                    let (stored_name, stored_skin, stored_title) = {
+                                        let peers = st_recv.peers.lock().unwrap();
+                                        peers
                                             .get(&pid_recv)
-                                            .and_then(|p| p.name.clone())
-                                    });
+                                            .map(|p| (p.name.clone(), p.cursor_skin.clone(), p.title.clone()))
+                                            .unwrap_or((None, None, None))
+                                    };
+                                    let name = incoming_name.or(stored_name);
                                     let payload = json!({
                                         "type": "cursor",
                                         "peerId": pid_recv,
                                         "color": color_recv,
                                         "isAdmin": is_admin,
                                         "name": name,
+                                        "cursorSkin": stored_skin,
+                                        "title": stored_title,
                                         "x": x,
                                         "y": y,
                                         "down": down
@@ -1441,6 +1657,9 @@ async fn main() {
         .route("/api/wallet/bailout", post(bailout_wallet))
         .route("/api/leaderboard", get(get_leaderboard))
         .route("/api/bets", post(place_bet))
+        .route("/api/lootboxes", get(get_lootboxes))
+        .route("/api/lootboxes/open", post(open_lootbox_handler))
+        .route("/api/lootboxes/equip", post(equip_loot_handler))
         .route("/mcp", get(mcp_get).post(mcp_post).delete(mcp_delete))
         .route("/ws", get(ws_handler))
         .layer(cors)

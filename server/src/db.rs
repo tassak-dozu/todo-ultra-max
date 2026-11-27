@@ -139,6 +139,114 @@ pub struct ResolutionSummary {
     pub loser_count: i64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LootDrop {
+    pub id: String,
+    pub item_key: String,
+    pub name: String,
+    pub icon: String,
+    pub rarity: String,
+    pub kind: String,
+    pub value: String,
+    pub coin_bonus: i64,
+    pub opened_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayerLoadout {
+    pub cursor_skin: Option<String>,
+    pub title: Option<String>,
+}
+
+pub struct LootDef {
+    pub key: &'static str,
+    pub name: &'static str,
+    pub icon: &'static str,
+    pub rarity: &'static str,
+    pub kind: &'static str,
+    pub value: &'static str,
+    pub coin_bonus: i64,
+}
+
+pub const LOOT_POOL: &[LootDef] = &[
+    LootDef { key: "coins_50", name: "Pocket Lint (+50 🪙)", icon: "🪙", rarity: "common", kind: "coins", value: "50", coin_bonus: 50 },
+    LootDef { key: "roast_ratio", name: "Skill Issue (-0 🪙, +1 Ratio)", icon: "💀", rarity: "common", kind: "roast", value: "ratio", coin_bonus: 0 },
+    LootDef { key: "roast_grass", name: "Touch Grass Permit: REVOKED", icon: "🌿", rarity: "common", kind: "roast", value: "grass", coin_bonus: 0 },
+    LootDef { key: "roast_gold", name: "Edit: Thanks For The Gold Kind Stranger!", icon: "🏅", rarity: "common", kind: "roast", value: "gold", coin_bonus: 0 },
+    LootDef { key: "title_intern", name: "Title: 10x Intern", icon: "📎", rarity: "common", kind: "title", value: "10x INTERN 📎", coin_bonus: 0 },
+    LootDef { key: "coins_200", name: "Stimulus Check (+200 🪙)", icon: "💵", rarity: "rare", kind: "coins", value: "200", coin_bonus: 200 },
+    LootDef { key: "roast_fedora", name: "\"Erm Actually\" Fedora of Cope", icon: "🤓", rarity: "rare", kind: "roast", value: "fedora", coin_bonus: 0 },
+    LootDef { key: "roast_karma", name: "Downvoted to Oblivion (-420 Karma)", icon: "⬇️", rarity: "rare", kind: "roast", value: "karma", coin_bonus: 0 },
+    LootDef { key: "title_degen", name: "Title: Solana Degen", icon: "🎰", rarity: "rare", kind: "title", value: "SOLANA DEGEN 🎰", coin_bonus: 0 },
+    LootDef { key: "cursor_bolt", name: "Cursor: Cyber Lightning", icon: "⚡", rarity: "rare", kind: "cursor", value: "bolt", coin_bonus: 0 },
+    LootDef { key: "coins_600", name: "VC Seed Round (+600 🪙)", icon: "💰", rarity: "epic", kind: "coins", value: "600", coin_bonus: 600 },
+    LootDef { key: "title_mod", name: "Title: Certified Reddit Mod", icon: "🤓", rarity: "epic", kind: "title", value: "REDDIT MOD 🤓", coin_bonus: 0 },
+    LootDef { key: "title_chad", name: "Title: Giga Chad", icon: "🗿", rarity: "epic", kind: "title", value: "GIGA CHAD 🗿", coin_bonus: 0 },
+    LootDef { key: "cursor_flame", name: "Cursor: Hellfire Blade", icon: "🔥", rarity: "epic", kind: "cursor", value: "flame", coin_bonus: 0 },
+    LootDef { key: "cursor_diamond", name: "Cursor: Liquid Prism", icon: "💎", rarity: "epic", kind: "cursor", value: "diamond", coin_bonus: 0 },
+    LootDef { key: "coins_1800", name: "Insider Alpha (+1,800 🪙)", icon: "🏦", rarity: "legendary", kind: "coins", value: "1800", coin_bonus: 1800 },
+    LootDef { key: "title_whale", name: "Title: Aura Whale", icon: "🐋", rarity: "legendary", kind: "title", value: "AURA WHALE 🐋", coin_bonus: 0 },
+    LootDef { key: "cursor_crown", name: "Cursor: Sovereign Crown", icon: "👑", rarity: "legendary", kind: "cursor", value: "crown", coin_bonus: 0 },
+    LootDef { key: "cursor_ufo", name: "Cursor: Cosmic Abductor", icon: "🛸", rarity: "legendary", kind: "cursor", value: "ufo", coin_bonus: 0 },
+    LootDef { key: "coins_5000", name: "RUGPULL JACKPOT (+5,000 🪙)", icon: "🤑", rarity: "mythic", kind: "coins", value: "5000", coin_bonus: 5000 },
+    LootDef { key: "title_overlord", name: "Title: AI Overlord", icon: "🤖", rarity: "mythic", kind: "title", value: "AI OVERLORD 🤖", coin_bonus: 0 },
+    LootDef { key: "cursor_scythe", name: "Cursor: Mythic Reaper", icon: "💀", rarity: "mythic", kind: "cursor", value: "scythe", coin_bonus: 0 },
+];
+
+pub fn crate_meta(crate_id: &str) -> Option<(&'static str, i64)> {
+    match crate_id {
+        "standard" => Some(("Standard Crate", 100)),
+        "glass" => Some(("Liquid Glass Case", 350)),
+        "aura" => Some(("Admin Aura Relic Chest", 1000)),
+        _ => None,
+    }
+}
+
+fn loot_weight(crate_id: &str, rarity: &str) -> u32 {
+    match crate_id {
+        "standard" => match rarity {
+            "common" => 420,
+            "rare" => 220,
+            "epic" => 65,
+            "legendary" => 18,
+            "mythic" => 4,
+            _ => 0,
+        },
+        "glass" => match rarity {
+            "common" => 110,
+            "rare" => 260,
+            "epic" => 170,
+            "legendary" => 55,
+            "mythic" => 14,
+            _ => 0,
+        },
+        "aura" => match rarity {
+            "common" => 0,
+            "rare" => 90,
+            "epic" => 240,
+            "legendary" => 160,
+            "mythic" => 55,
+            _ => 0,
+        },
+        _ => 0,
+    }
+}
+
+fn roll_loot(crate_id: &str) -> &'static LootDef {
+    let total: u32 = LOOT_POOL.iter().map(|i| loot_weight(crate_id, i.rarity)).sum();
+    let rnd = (Uuid::new_v4().as_u128() % (total.max(1) as u128)) as u32;
+    let mut acc = 0u32;
+    for item in LOOT_POOL {
+        acc += loot_weight(crate_id, item.rarity);
+        if rnd < acc {
+            return item;
+        }
+    }
+    &LOOT_POOL[0]
+}
+
 pub struct TodoDB {
     conn: Mutex<Connection>,
     max_todos: i64,
@@ -263,6 +371,25 @@ impl TodoDB {
                token_hash TEXT PRIMARY KEY,
                created_at INTEGER NOT NULL,
                expires_at INTEGER NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS loot_inventory (
+               id TEXT PRIMARY KEY,
+               player_id TEXT NOT NULL,
+               item_key TEXT NOT NULL,
+               name TEXT NOT NULL,
+               icon TEXT NOT NULL,
+               rarity TEXT NOT NULL,
+               kind TEXT NOT NULL,
+               value TEXT NOT NULL,
+               coin_bonus INTEGER NOT NULL DEFAULT 0,
+               opened_at INTEGER NOT NULL
+             );
+             CREATE INDEX IF NOT EXISTS idx_loot_player ON loot_inventory(player_id, opened_at DESC);
+             CREATE TABLE IF NOT EXISTS player_loadout (
+               player_id TEXT PRIMARY KEY,
+               cursor_skin TEXT,
+               title TEXT,
+               updated_at INTEGER NOT NULL
              );",
         )
         .map_err(|e| e.to_string())?;
@@ -1037,5 +1164,171 @@ impl TodoDB {
             Err(_) => return Vec::new(),
         };
         rows.flatten().collect()
+    }
+
+    // --- Lootboxes & Player Cosmetics ---
+
+    fn get_loadout_conn(conn: &Connection, player_id: &str) -> PlayerLoadout {
+        conn.query_row(
+            "SELECT cursor_skin, title FROM player_loadout WHERE player_id = ?",
+            params![player_id],
+            |r| {
+                Ok(PlayerLoadout {
+                    cursor_skin: r.get(0)?,
+                    title: r.get(1)?,
+                })
+            },
+        )
+        .optional()
+        .ok()
+        .flatten()
+        .unwrap_or_default()
+    }
+
+    fn get_inventory_conn(conn: &Connection, player_id: &str, limit: i64) -> Vec<LootDrop> {
+        let mut stmt = match conn.prepare(
+            "SELECT id, item_key, name, icon, rarity, kind, value, coin_bonus, opened_at FROM loot_inventory WHERE player_id = ? ORDER BY opened_at DESC LIMIT ?",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        let rows = match stmt.query_map(params![player_id, limit], |r| {
+            Ok(LootDrop {
+                id: r.get(0)?,
+                item_key: r.get(1)?,
+                name: r.get(2)?,
+                icon: r.get(3)?,
+                rarity: r.get(4)?,
+                kind: r.get(5)?,
+                value: r.get(6)?,
+                coin_bonus: r.get(7)?,
+                opened_at: r.get(8)?,
+            })
+        }) {
+            Ok(r) => r,
+            Err(_) => return Vec::new(),
+        };
+        rows.flatten().collect()
+    }
+
+    pub fn get_loot_state(
+        &self,
+        raw_player_id: &str,
+        raw_name: Option<&str>,
+    ) -> Result<(Wallet, Vec<LootDrop>, PlayerLoadout), String> {
+        let conn = self.conn.lock().unwrap();
+        let wallet = Self::get_or_create_wallet_conn(&conn, raw_player_id, raw_name)?;
+        let inv = Self::get_inventory_conn(&conn, &wallet.player_id, 40);
+        let loadout = Self::get_loadout_conn(&conn, &wallet.player_id);
+        Ok((wallet, inv, loadout))
+    }
+
+    pub fn open_lootbox(
+        &self,
+        raw_player_id: &str,
+        raw_name: Option<&str>,
+        crate_id: &str,
+    ) -> Result<(Wallet, LootDrop, Vec<LootDrop>, PlayerLoadout, &'static str), String> {
+        let (crate_name, cost) =
+            crate_meta(crate_id).ok_or_else(|| "Unknown lootbox tier".to_string())?;
+        let mut conn = self.conn.lock().unwrap();
+        let mut wallet = Self::get_or_create_wallet_conn(&conn, raw_player_id, raw_name)?;
+        if wallet.balance < cost {
+            return Err(format!(
+                "Need {cost} 🪙 to crack a {crate_name} (you have {} 🪙)!",
+                wallet.balance
+            ));
+        }
+
+        let rolled = roll_loot(crate_id);
+        let now = now_ms();
+        let drop_id = Uuid::new_v4().to_string();
+        wallet.balance = wallet.balance - cost + rolled.coin_bonus;
+        wallet.total_won += rolled.coin_bonus;
+
+        let tx = conn.transaction().map_err(|e| e.to_string())?;
+        tx.execute(
+            "UPDATE wallets SET balance = ?, total_won = ?, updated_at = ? WHERE player_id = ?",
+            params![wallet.balance, wallet.total_won, now, &wallet.player_id],
+        )
+        .map_err(|e| e.to_string())?;
+        tx.execute(
+            "INSERT INTO loot_inventory (id, player_id, item_key, name, icon, rarity, kind, value, coin_bonus, opened_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            params![
+                &drop_id,
+                &wallet.player_id,
+                rolled.key,
+                rolled.name,
+                rolled.icon,
+                rolled.rarity,
+                rolled.kind,
+                rolled.value,
+                rolled.coin_bonus,
+                now
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        tx.commit().map_err(|e| e.to_string())?;
+
+        let drop = LootDrop {
+            id: drop_id,
+            item_key: rolled.key.to_string(),
+            name: rolled.name.to_string(),
+            icon: rolled.icon.to_string(),
+            rarity: rolled.rarity.to_string(),
+            kind: rolled.kind.to_string(),
+            value: rolled.value.to_string(),
+            coin_bonus: rolled.coin_bonus,
+            opened_at: now,
+        };
+        let inv = Self::get_inventory_conn(&conn, &wallet.player_id, 40);
+        let loadout = Self::get_loadout_conn(&conn, &wallet.player_id);
+        Ok((wallet, drop, inv, loadout, crate_name))
+    }
+
+    pub fn equip_loot(
+        &self,
+        raw_player_id: &str,
+        item_id: Option<&str>,
+        clear_slot: Option<&str>,
+    ) -> Result<PlayerLoadout, String> {
+        let player_id: String = raw_player_id.trim().chars().take(64).collect();
+        if player_id.is_empty() {
+            return Err("playerId is required".to_string());
+        }
+        let conn = self.conn.lock().unwrap();
+        let mut loadout = Self::get_loadout_conn(&conn, &player_id);
+
+        if let Some(slot) = clear_slot {
+            match slot {
+                "cursor" => loadout.cursor_skin = None,
+                "title" => loadout.title = None,
+                _ => return Err("Invalid slot to clear".to_string()),
+            }
+        } else if let Some(iid) = item_id {
+            let found: Option<(String, String)> = conn
+                .query_row(
+                    "SELECT kind, value FROM loot_inventory WHERE id = ? AND player_id = ?",
+                    params![iid, &player_id],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .optional()
+                .map_err(|e| e.to_string())?;
+            let (kind, value) = found.ok_or_else(|| "You don't own that item!".to_string())?;
+            match kind.as_str() {
+                "cursor" => loadout.cursor_skin = Some(value),
+                "title" => loadout.title = Some(value),
+                _ => return Err("Coins can't be equipped — spend 'em!".to_string()),
+            }
+        } else {
+            return Err("Provide itemId or clear slot".to_string());
+        }
+
+        conn.execute(
+            "INSERT OR REPLACE INTO player_loadout (player_id, cursor_skin, title, updated_at) VALUES (?, ?, ?, ?)",
+            params![&player_id, &loadout.cursor_skin, &loadout.title, now_ms()],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(loadout)
     }
 }
