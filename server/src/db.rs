@@ -35,6 +35,13 @@ pub fn is_valid_bucket(b: &str) -> bool {
     VALID_BUCKETS.contains(&b)
 }
 
+fn normalize_todo_key(s: &str) -> String {
+    s.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
 pub fn bucket_label(bucket: &str) -> &'static str {
     match bucket {
         "speedrun" => "⚡ < 5 min",
@@ -563,6 +570,31 @@ impl TodoDB {
         self.add_with_source(raw_text, status, priority, "web")
     }
 
+    fn check_duplicate_conn(
+        conn: &Connection,
+        text: &str,
+        exclude_id: Option<&str>,
+    ) -> Result<(), String> {
+        let needle = normalize_todo_key(text);
+        let mut stmt = conn
+            .prepare("SELECT id, text FROM todos")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+            .map_err(|e| e.to_string())?;
+        for (cid, existing_text) in rows.flatten() {
+            if exclude_id == Some(cid.as_str()) {
+                continue;
+            }
+            if normalize_todo_key(&existing_text) == needle {
+                return Err(format!(
+                    "DUPLICATE: \"{text}\" is already on the board — no clones allowed!"
+                ));
+            }
+        }
+        Ok(())
+    }
+
     pub fn add_with_source(
         &self,
         raw_text: &str,
@@ -579,6 +611,7 @@ impl TodoDB {
         }
 
         let conn = self.conn.lock().unwrap();
+        Self::check_duplicate_conn(&conn, text, None)?;
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM todos", [], |r| r.get(0))
             .unwrap_or(0);
@@ -665,6 +698,7 @@ impl TodoDB {
             if trimmed.is_empty() || trimmed.chars().count() > MAX_TEXT_LENGTH {
                 return Err(format!("Task text must be 1..{MAX_TEXT_LENGTH} characters"));
             }
+            Self::check_duplicate_conn(&conn, trimmed, Some(id))?;
             trimmed.to_string()
         } else {
             existing.text.clone()

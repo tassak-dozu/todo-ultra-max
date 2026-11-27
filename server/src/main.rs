@@ -758,6 +758,10 @@ async fn create_todo(
             st.broadcast_sync(Some(&ev), None);
             json_resp(StatusCode::CREATED, json!({ "todo": todo }))
         }
+        Err(msg) if msg.starts_with("DUPLICATE:") => json_resp(
+            StatusCode::TOO_MANY_REQUESTS,
+            json!({ "error": msg, "code": "duplicate" }),
+        ),
         Err(msg) => json_resp(StatusCode::BAD_REQUEST, json!({ "error": msg })),
     }
 }
@@ -880,6 +884,10 @@ async fn patch_todo(
             )
         }
         Ok(None) => json_resp(StatusCode::NOT_FOUND, json!({ "error": "Todo not found" })),
+        Err(msg) if msg.starts_with("DUPLICATE:") => json_resp(
+            StatusCode::TOO_MANY_REQUESTS,
+            json!({ "error": msg, "code": "duplicate" }),
+        ),
         Err(msg) => json_resp(StatusCode::BAD_REQUEST, json!({ "error": msg })),
     }
 }

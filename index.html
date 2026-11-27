@@ -5152,6 +5152,22 @@
         render();
         burstAtEl(addBtn, 22);
       } catch (err) {
+        if (err.status === 429) {
+          const dupKey = trimmed.replace(/\s+/g, " ").toLowerCase();
+          const match = todos.find((t) => t.text.trim().replace(/\s+/g, " ").toLowerCase() === dupKey);
+          if (match) {
+            flashCardId = match.id;
+            render();
+            const dupEl = document.querySelector(`.card[data-id="${match.id}"]`);
+            if (dupEl) {
+              dupEl.classList.remove("aura-repel");
+              void dupEl.offsetWidth;
+              dupEl.classList.add("aura-repel");
+            }
+          }
+          sfx.betLost();
+          showToast("🚫 Duplicate detected (HTTP 429) — already on the board!", "web");
+        }
         handleApiError("Failed to add task", err);
       } finally {
         pendingMutations--;
