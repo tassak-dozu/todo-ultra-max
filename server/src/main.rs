@@ -239,7 +239,15 @@ impl AppState {
         true
     }
 
-    fn check_cooldown(map_mutex: &Mutex<HashMap<String, i64>>, key: &str) -> Result<(), i64> {
+    fn check_cooldown(
+        &self,
+        headers: &HeaderMap,
+        map_mutex: &Mutex<HashMap<String, i64>>,
+        key: &str,
+    ) -> Result<(), i64> {
+        if self.is_admin(headers, None) {
+            return Ok(());
+        }
         let now = now_ms();
         let mut map = map_mutex.lock().unwrap();
         if let Some(&until) = map.get(key) {
@@ -252,12 +260,24 @@ impl AppState {
         Ok(())
     }
 
-    fn set_cooldown(map_mutex: &Mutex<HashMap<String, i64>>, key: &str, duration_ms: i64) {
+    fn set_cooldown(
+        &self,
+        headers: &HeaderMap,
+        map_mutex: &Mutex<HashMap<String, i64>>,
+        key: &str,
+        duration_ms: i64,
+    ) {
+        if self.is_admin(headers, None) {
+            return;
+        }
         let mut map = map_mutex.lock().unwrap();
         map.insert(key.to_string(), now_ms() + duration_ms);
     }
 
-    fn check_rate_limit(&self, ip: &str) -> bool {
+    fn check_rate_limit(&self, headers: &HeaderMap, ip: &str) -> bool {
+        if self.is_admin(headers, None) {
+            return true;
+        }
         let now = now_ms();
         let mut map = self.rate_buckets.lock().unwrap();
         let entry = map.entry(ip.to_string()).or_insert((0, now + 60_000));
@@ -877,13 +897,13 @@ async fn create_todo(
         );
     }
     let ip = st.client_ip(&headers);
-    if !st.check_rate_limit(&ip) {
+    if !st.check_rate_limit(&headers, &ip) {
         return json_resp(
             StatusCode::TOO_MANY_REQUESTS,
             json!({ "error": "Too many requests, slow down" }),
         );
     }
-    if let Err(sec) = AppState::check_cooldown(&st.add_cooldowns, &ip) {
+    if let Err(sec) = st.check_cooldown(&headers, &st.add_cooldowns, &ip) {
         return json_resp(
             StatusCode::TOO_MANY_REQUESTS,
             json!({
@@ -926,7 +946,7 @@ async fn create_todo(
 
     match st.db.add(text, body.status.as_deref(), body.priority.as_deref()) {
         Ok(todo) => {
-            AppState::set_cooldown(&st.add_cooldowns, &ip, 20_000);
+            st.set_cooldown(&headers, &st.add_cooldowns, &ip, 20_000);
             let short: String = todo.text.chars().take(48).collect();
             let ev = st.record_activity(
                 "added",
@@ -957,7 +977,7 @@ async fn clear_completed(
         );
     }
     let ip = st.client_ip(&headers);
-    if !st.check_rate_limit(&ip) {
+    if !st.check_rate_limit(&headers, &ip) {
         return json_resp(
             StatusCode::TOO_MANY_REQUESTS,
             json!({ "error": "Too many requests, slow down" }),
@@ -1025,13 +1045,13 @@ async fn patch_todo(
         );
     }
     let ip = st.client_ip(&headers);
-    if !st.check_rate_limit(&ip) {
+    if !st.check_rate_limit(&headers, &ip) {
         return json_resp(
             StatusCode::TOO_MANY_REQUESTS,
             json!({ "error": "Too many requests, slow down" }),
         );
     }
-    if let Err(sec) = AppState::check_cooldown(&st.move_cooldowns, &ip) {
+    if let Err(sec) = st.check_cooldown(&headers, &st.move_cooldowns, &ip) {
         return json_resp(
             StatusCode::TOO_MANY_REQUESTS,
             json!({
@@ -1051,7 +1071,7 @@ async fn patch_todo(
         body.position,
     ) {
         Ok(Some((updated, resolution))) => {
-            AppState::set_cooldown(&st.move_cooldowns, &ip, 1_000);
+            st.set_cooldown(&headers, &st.move_cooldowns, &ip, 1_000);
             let moved = before.as_ref().map(|b| b.status != updated.status).unwrap_or(false);
             let short: String = updated.text.chars().take(42).collect();
             let mut ev = st.record_activity(
@@ -1095,13 +1115,13 @@ async fn delete_todo(
         );
     }
     let ip = st.client_ip(&headers);
-    if !st.check_rate_limit(&ip) {
+    if !st.check_rate_limit(&headers, &ip) {
         return json_resp(
             StatusCode::TOO_MANY_REQUESTS,
             json!({ "error": "Too many requests, slow down" }),
         );
     }
-    if let Err(sec) = AppState::check_cooldown(&st.delete_cooldowns, &ip) {
+    if let Err(sec) = st.check_cooldown(&headers, &st.delete_cooldowns, &ip) {
         return json_resp(
             StatusCode::TOO_MANY_REQUESTS,
             json!({
@@ -1131,7 +1151,7 @@ async fn delete_todo(
     let before = st.db.get(&id);
     match st.db.delete(&id) {
         Ok((true, resolution)) => {
-            AppState::set_cooldown(&st.delete_cooldowns, &ip, 60_000);
+            st.set_cooldown(&headers, &st.delete_cooldowns, &ip, 60_000);
             let summary = match before {
                 Some(b) => {
                     let short: String = b.text.chars().take(44).collect();
@@ -1250,7 +1270,7 @@ async fn spin_wallet(
         return json_resp(StatusCode::UNAUTHORIZED, json!({ "error": "API key required" }));
     }
     let ip = st.client_ip(&headers);
-    if !st.check_rate_limit(&ip) {
+    if !st.check_rate_limit(&headers, &ip) {
         return json_resp(
             StatusCode::TOO_MANY_REQUESTS,
             json!({ "error": "Chill out, rate limit hit" }),
@@ -1319,7 +1339,7 @@ async fn place_bet(
         );
     }
     let ip = st.client_ip(&headers);
-    if !st.check_rate_limit(&ip) {
+    if !st.check_rate_limit(&headers, &ip) {
         return json_resp(
             StatusCode::TOO_MANY_REQUESTS,
             json!({ "error": "Chill out degenerate, rate limit hit" }),
@@ -1416,7 +1436,7 @@ async fn open_lootbox_handler(
         return json_resp(StatusCode::UNAUTHORIZED, json!({ "error": "API key required" }));
     }
     let ip = st.client_ip(&headers);
-    if !st.check_rate_limit(&ip) {
+    if !st.check_rate_limit(&headers, &ip) {
         return json_resp(
             StatusCode::TOO_MANY_REQUESTS,
             json!({ "error": "Chill out, rate limit hit" }),
