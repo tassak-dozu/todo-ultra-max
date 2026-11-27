@@ -1655,7 +1655,6 @@
             <h2 class="col-title">Certified Done</h2>
             <span class="col-count mono" id="count-done">0</span>
           </div>
-          <button type="button" class="col-action" id="clear-done-kanban">🧹 Nuke done</button>
         </div>
         <div class="col-cards" id="col-done"></div>
       </section>
@@ -1670,7 +1669,6 @@
           <button type="button" class="filter-btn" data-filter="in_progress">Cooking</button>
           <button type="button" class="filter-btn" data-filter="done">Done</button>
         </div>
-        <button type="button" class="col-action" id="clear-done-list">🧹 Nuke done</button>
       </div>
       <ul class="list-items" id="list-items"></ul>
     </section>
@@ -2830,9 +2828,6 @@
         render();
       })
     );
-
-    document.getElementById("clear-done-kanban").addEventListener("click", clearCompleted);
-    document.getElementById("clear-done-list").addEventListener("click", clearCompleted);
 
     document.addEventListener("keydown", (e) => {
       if (e.key === "/" && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
