@@ -1,6 +1,5 @@
-use rand::seq::SliceRandom;
-use rand::Rng;
-use serde::Serialize;
+use reqwest::Client;
+use serde::Deserialize;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 use uuid::Uuid;
@@ -10,97 +9,78 @@ use crate::db::now_ms;
 const FREE_BURST_ACTIONS: usize = 3;
 const WINDOW_MS: i64 = 60_000;
 const RAPID_GAP_MS: i64 = 1_400;
-const CHALLENGE_TTL_MS: i64 = 90_000;
 const PASS_TTL_MS: i64 = 5 * 60 * 1000;
 const PASS_CREDITS: u32 = 10;
-
-const POOL: [(&str, &str); 12] = [
-    ("🦀", "Blazingly Fast Crab"),
-    ("🧠", "Quantum AI Brain"),
-    ("🚀", "Turbo Rocket"),
-    ("🔥", "Pure Aura Flame"),
-    ("⚡", "Hyper Bolt"),
-    ("🎰", "Degen Slot Machine"),
-    ("🛸", "Cloud UFO"),
-    ("💎", "Diamond Hands"),
-    ("🐉", "Production Dragon"),
-    ("🤖", "Friendly Overlord"),
-    ("🍕", "3AM Deploy Pizza"),
-    ("👑", "Kanban Crown"),
-];
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CaptchaOption {
-    pub id: String,
-    pub emoji: String,
-    pub label: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CaptchaChallengePublic {
-    pub id: String,
-    pub prompt: String,
-    pub target_emoji: String,
-    pub options: Vec<CaptchaOption>,
-    pub expires_at: i64,
-}
-
-struct StoredChallenge {
-    ip: String,
-    answer_id: String,
-    expires_at: i64,
-}
+const TURNSTILE_VERIFY_URL: &str = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
 struct HumanPass {
     remaining: u32,
     expires_at: i64,
 }
 
-struct CaptchaInner {
+struct GateInner {
     recent_actions: HashMap<String, VecDeque<i64>>,
     passes: HashMap<String, HumanPass>,
-    challenges: HashMap<String, StoredChallenge>,
     one_time_tokens: HashMap<String, (String, i64)>,
 }
 
-pub struct CaptchaGate {
-    inner: Mutex<CaptchaInner>,
+#[derive(Deserialize)]
+struct SiteVerifyResponse {
+    success: bool,
+    #[serde(rename = "error-codes", default)]
+    error_codes: Vec<String>,
 }
 
-impl CaptchaGate {
-    pub fn new() -> Self {
+pub struct TurnstileGate {
+    secret_key: Option<String>,
+    pub site_key: Option<String>,
+    http: Client,
+    inner: Mutex<GateInner>,
+}
+
+impl TurnstileGate {
+    pub fn new(site_key: String, secret_key: String) -> Self {
+        let sk = secret_key.trim().to_string();
+        let pk = site_key.trim().to_string();
         Self {
-            inner: Mutex::new(CaptchaInner {
+            secret_key: if sk.is_empty() { None } else { Some(sk) },
+            site_key: if pk.is_empty() { None } else { Some(pk) },
+            http: Client::builder()
+                .timeout(std::time::Duration::from_secs(8))
+                .build()
+                .expect("Failed to build HTTP client"),
+            inner: Mutex::new(GateInner {
                 recent_actions: HashMap::new(),
                 passes: HashMap::new(),
-                challenges: HashMap::new(),
                 one_time_tokens: HashMap::new(),
             }),
         }
     }
 
-    /// Returns Ok(()) if this add/delete action is allowed without a popup right now,
-    /// or Err(challenge) if the adaptive aura captcha should pop up.
-    pub fn check_or_challenge(
+    pub fn is_enabled(&self) -> bool {
+        self.secret_key.is_some()
+    }
+
+    /// Returns Ok(()) if action is permitted immediately without Turnstile,
+    /// or Err(()) if the caller must complete Cloudflare Turnstile.
+    pub fn check_or_require(
         &self,
         ip: &str,
-        captcha_token: Option<&str>,
-    ) -> Result<(), CaptchaChallengePublic> {
+        one_time_token: Option<&str>,
+    ) -> Result<(), ()> {
+        if !self.is_enabled() {
+            return Ok(());
+        }
+
         let now = now_ms();
         let mut inner = self.inner.lock().unwrap();
 
-        // Purge expired tokens/challenges opportunistically
-        if inner.challenges.len() > 256 {
-            inner.challenges.retain(|_, c| c.expires_at > now);
-        }
         if inner.one_time_tokens.len() > 256 {
             inner.one_time_tokens.retain(|_, (_, exp)| *exp > now);
         }
 
-        // 1. Check explicit one-time verified captcha token
-        if let Some(tok) = captcha_token {
+        // 1. Check one-time server token minted immediately after Turnstile verification
+        if let Some(tok) = one_time_token {
             if let Some((tok_ip, exp)) = inner.one_time_tokens.remove(tok) {
                 if exp > now && tok_ip == ip {
                     Self::record_action(&mut inner, ip, now);
@@ -109,7 +89,7 @@ impl CaptchaGate {
             }
         }
 
-        // 2. Check active verified human pass (grants 10 smooth actions for 5 min)
+        // 2. Check active verified human pass (10 smooth actions for 5 min)
         if let Some(pass) = inner.passes.get_mut(ip) {
             if pass.expires_at > now && pass.remaining > 0 {
                 pass.remaining -= 1;
@@ -120,7 +100,7 @@ impl CaptchaGate {
             }
         }
 
-        // 3. Adaptive burst check: first 3 actions per minute (not faster than 1.4s apart) are frictionless
+        // 3. Adaptive burst check: first 3 adds/deletes per minute (>= 1.4s apart) require no captcha
         let queue = inner.recent_actions.entry(ip.to_string()).or_default();
         while let Some(&front) = queue.front() {
             if now - front > WINDOW_MS {
@@ -130,7 +110,10 @@ impl CaptchaGate {
             }
         }
 
-        let too_fast = queue.back().map(|&last| now - last < RAPID_GAP_MS).unwrap_or(false);
+        let too_fast = queue
+            .back()
+            .map(|&last| now - last < RAPID_GAP_MS)
+            .unwrap_or(false);
         let too_many = queue.len() >= FREE_BURST_ACTIONS;
 
         if !too_fast && !too_many {
@@ -138,10 +121,10 @@ impl CaptchaGate {
             return Ok(());
         }
 
-        Err(Self::create_challenge_locked(&mut inner, ip, now))
+        Err(())
     }
 
-    fn record_action(inner: &mut CaptchaInner, ip: &str, now: i64) {
+    fn record_action(inner: &mut GateInner, ip: &str, now: i64) {
         let queue = inner.recent_actions.entry(ip.to_string()).or_default();
         queue.push_back(now);
         while queue.len() > 16 {
@@ -149,83 +132,56 @@ impl CaptchaGate {
         }
     }
 
-    pub fn issue_challenge(&self, ip: &str) -> CaptchaChallengePublic {
-        let now = now_ms();
-        let mut inner = self.inner.lock().unwrap();
-        Self::create_challenge_locked(&mut inner, ip, now)
-    }
-
-    fn create_challenge_locked(
-        inner: &mut CaptchaInner,
-        ip: &str,
-        now: i64,
-    ) -> CaptchaChallengePublic {
-        let mut rng = rand::thread_rng();
-        let mut choices: Vec<(&str, &str)> = POOL.to_vec();
-        choices.shuffle(&mut rng);
-        choices.truncate(6);
-
-        let target_idx = rng.gen_range(0..choices.len());
-        let (target_emoji, target_label) = choices[target_idx];
-
-        let mut answer_id = String::new();
-        let mut options = Vec::with_capacity(choices.len());
-        for (i, (emoji, label)) in choices.into_iter().enumerate() {
-            let opt_id = Uuid::new_v4().to_string()[..8].to_string();
-            if i == target_idx {
-                answer_id = opt_id.clone();
-            }
-            options.push(CaptchaOption {
-                id: opt_id,
-                emoji: emoji.to_string(),
-                label: label.to_string(),
-            });
-        }
-
-        let id = Uuid::new_v4().to_string();
-        let expires_at = now + CHALLENGE_TTL_MS;
-        inner.challenges.insert(
-            id.clone(),
-            StoredChallenge {
-                ip: ip.to_string(),
-                answer_id,
-                expires_at,
-            },
-        );
-
-        CaptchaChallengePublic {
-            id,
-            prompt: format!("Tap the {target_label} to prove your aura"),
-            target_emoji: target_emoji.to_string(),
-            options,
-            expires_at,
-        }
-    }
-
-    pub fn verify(
-        &self,
-        ip: &str,
-        challenge_id: &str,
-        answer_id: &str,
-    ) -> Result<(String, u32), String> {
-        let now = now_ms();
-        let mut inner = self.inner.lock().unwrap();
-
-        let Some(ch) = inner.challenges.remove(challenge_id) else {
-            return Err("Challenge expired or already used — try a fresh vibe check".to_string());
+    /// Verifies a real Cloudflare Turnstile client token via siteverify and grants a 10-move pass.
+    pub async fn verify_turnstile(&self, ip: &str, cf_token: &str) -> Result<(String, u32), String> {
+        let Some(ref secret) = self.secret_key else {
+            return Err("Turnstile is not configured on this server".to_string());
         };
-        if ch.expires_at <= now {
-            return Err("Challenge expired — try again".to_string());
-        }
-        if ch.ip != ip || ch.answer_id != answer_id {
-            return Err("Wrong vibe! Robots exposed 🤖 — try again".to_string());
+        let token_trimmed = cf_token.trim();
+        if token_trimmed.is_empty() {
+            return Err("Missing Cloudflare Turnstile response token".to_string());
         }
 
-        // Grant verified human pass + one-time token for immediate replay
-        let token = Uuid::new_v4().to_string();
+        let mut form = vec![
+            ("secret", secret.as_str()),
+            ("response", token_trimmed),
+        ];
+        if ip != "local" && !ip.is_empty() {
+            form.push(("remoteip", ip));
+        }
+
+        let resp = self
+            .http
+            .post(TURNSTILE_VERIFY_URL)
+            .form(&form)
+            .send()
+            .await
+            .map_err(|e| format!("Turnstile verification network error: {e}"))?;
+
+        if !resp.status().is_success() {
+            return Err(format!("Turnstile siteverify HTTP {}", resp.status()));
+        }
+
+        let parsed: SiteVerifyResponse = resp
+            .json()
+            .await
+            .map_err(|e| format!("Invalid Turnstile response: {e}"))?;
+
+        if !parsed.success {
+            let codes = if parsed.error_codes.is_empty() {
+                "verification-failed".to_string()
+            } else {
+                parsed.error_codes.join(", ")
+            };
+            return Err(format!("Cloudflare Turnstile rejected token ({codes})"));
+        }
+
+        let now = now_ms();
+        let one_time = Uuid::new_v4().to_string();
+        let mut inner = self.inner.lock().unwrap();
         inner
             .one_time_tokens
-            .insert(token.clone(), (ip.to_string(), now + 60_000));
+            .insert(one_time.clone(), (ip.to_string(), now + 60_000));
         inner.passes.insert(
             ip.to_string(),
             HumanPass {
@@ -235,6 +191,6 @@ impl CaptchaGate {
         );
         inner.recent_actions.remove(ip);
 
-        Ok((token, PASS_CREDITS))
+        Ok((one_time, PASS_CREDITS))
     }
 }

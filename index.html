@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Todo Ultra Max — Peak Productivity™</title>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <style>
     :root {
       --bg: #05060b;
@@ -240,55 +241,55 @@
       font-weight: 800;
     }
 
-    /* Aura Captcha Modal */
-    .captcha-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin: 14px 0 12px;
-    }
-
-    .captcha-tile {
+    /* Cloudflare Turnstile Aura Shield */
+    .turnstile-wrap {
       display: flex;
-      flex-direction: column;
-      align-items: center;
       justify-content: center;
-      gap: 6px;
-      padding: 16px 8px;
+      align-items: center;
+      min-height: 70px;
+      margin: 12px 0;
+      padding: 10px;
       border-radius: 14px;
       background: var(--input-bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      cursor: pointer;
-      transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.16s ease, background 0.14s ease;
+      border: 1px solid rgba(139, 92, 246, 0.35);
+      box-shadow: 0 0 28px rgba(139, 92, 246, 0.16);
     }
 
-    .captcha-tile:hover {
-      transform: translateY(-2px) scale(1.03);
-      border-color: rgba(139, 92, 246, 0.75);
-      background: rgba(139, 92, 246, 0.14);
-      box-shadow: 0 0 26px rgba(139, 92, 246, 0.35), 0 0 14px rgba(34, 211, 238, 0.25);
+    .modal-backdrop.silent-probe {
+      display: block;
+      background: transparent;
+      backdrop-filter: none;
+      pointer-events: none;
+      inset: auto;
+      bottom: 20px;
+      left: 20px;
+      width: auto;
+      height: auto;
+      padding: 0;
     }
 
-    .captcha-tile:active {
-      transform: scale(0.96);
+    .modal-backdrop.silent-probe .modal {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      padding: 0;
+      width: auto;
+      max-width: none;
     }
 
-    .captcha-emoji {
-      font-size: 1.9rem;
-      line-height: 1;
-      filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.25));
+    .modal-backdrop.silent-probe .modal-head,
+    .modal-backdrop.silent-probe .turnstile-desc,
+    .modal-backdrop.silent-probe .key-feedback {
+      display: none;
     }
 
-    .captcha-prompt-box {
-      padding: 11px 14px;
-      border-radius: 12px;
-      background: linear-gradient(120deg, rgba(139, 92, 246, 0.16), rgba(34, 211, 238, 0.12));
-      border: 1px solid rgba(139, 92, 246, 0.38);
-      font-size: 0.9rem;
-      font-weight: 700;
-      color: var(--text);
-      text-align: center;
+    .modal-backdrop.silent-probe .turnstile-wrap {
+      margin: 0;
+      padding: 0;
+      min-height: 0;
+      background: transparent;
+      border: none;
+      box-shadow: none;
     }
 
     html[data-theme="light"] .brand-title {
@@ -1676,20 +1677,19 @@
 
     <footer class="ai-footer">
       <span>✨ <strong>Powered by AI™</strong> · 100% Artisanal Neural Synergy (zero hallucinations promised*)</span>
-      <span class="mono">🦀 <strong>BLAZINGLY FAST RUST</strong> · Zero-GC · Adaptive Aura Captcha</span>
+      <span class="mono">🦀 <strong>BLAZINGLY FAST RUST</strong> · Zero-GC · 🛡️ Cloudflare Turnstile</span>
     </footer>
   </div>
 
-  <!-- Aura Captcha Modal -->
+  <!-- Cloudflare Turnstile Aura Modal -->
   <div class="modal-backdrop" id="captcha-modal" role="dialog" aria-modal="true" aria-labelledby="captcha-title">
     <div class="modal">
       <div class="modal-head">
-        <h2 id="captcha-title">🛡️ Aura Vibe Check</h2>
+        <h2 id="captcha-title">🛡️ Cloudflare Aura Check</h2>
         <button type="button" class="icon-btn" id="captcha-close">&times;</button>
       </div>
-      <p>Slow down speedrunner — pass one quick vibe check to unlock 10 smooth moves.</p>
-      <div class="captcha-prompt-box" id="captcha-prompt">Loading vibe check...</div>
-      <div class="captcha-grid" id="captcha-grid"></div>
+      <p class="turnstile-desc">Slow down speedrunner — quick Cloudflare verification unlocks 10 smooth moves.</p>
+      <div class="turnstile-wrap" id="turnstile-container"></div>
       <div class="key-feedback" id="captcha-feedback"></div>
     </div>
   </div>
@@ -2219,8 +2219,8 @@
       }
       const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
       const data = await res.json().catch(() => ({}));
-      if (res.status === 428 && data.captchaRequired && data.challenge && !options._captchaRetried) {
-        const captchaToken = await solveAuraCaptcha(data.challenge);
+      if (res.status === 428 && data.captchaRequired && !options._captchaRetried) {
+        const captchaToken = await solveTurnstileChallenge(data.siteKey);
         return api(path, {
           ...options,
           _captchaRetried: true,
@@ -2849,22 +2849,35 @@
       }
     });
 
-    // Adaptive Aura Captcha Modal Controller
+    // Adaptive Cloudflare Turnstile Controller
+    const DEFAULT_TURNSTILE_SITE_KEY = "0x4AAAAAAGVkrrAGulz-7yr5";
     const captchaModal = document.getElementById("captcha-modal");
     const captchaClose = document.getElementById("captcha-close");
-    const captchaPrompt = document.getElementById("captcha-prompt");
-    const captchaGrid = document.getElementById("captcha-grid");
+    const turnstileContainer = document.getElementById("turnstile-container");
     const captchaFeedback = document.getElementById("captcha-feedback");
     let captchaResolver = null;
     let captchaRejecter = null;
+    let turnstileWidgetId = null;
+    let turnstileRevealTimer = null;
+
+    function resetTurnstileHost() {
+      clearTimeout(turnstileRevealTimer);
+      turnstileRevealTimer = null;
+      captchaModal.classList.remove("open", "silent-probe");
+      if (turnstileWidgetId !== null && window.turnstile) {
+        try { window.turnstile.remove(turnstileWidgetId); } catch {}
+        turnstileWidgetId = null;
+      }
+      turnstileContainer.innerHTML = "";
+    }
 
     function cancelAuraCaptcha() {
-      captchaModal.classList.remove("open");
+      resetTurnstileHost();
       if (captchaRejecter) {
         const rej = captchaRejecter;
         captchaResolver = null;
         captchaRejecter = null;
-        rej(new Error("Vibe check cancelled"));
+        rej(new Error("Cloudflare verification cancelled"));
       }
     }
 
@@ -2873,57 +2886,105 @@
       if (e.target === captchaModal) cancelAuraCaptcha();
     });
 
-    function renderCaptchaChallenge(challenge) {
-      captchaPrompt.textContent = challenge.prompt;
-      captchaGrid.innerHTML = "";
-      for (const opt of challenge.options) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "captcha-tile";
-        const em = document.createElement("span");
-        em.className = "captcha-emoji";
-        em.textContent = opt.emoji;
-        btn.appendChild(em);
-        btn.addEventListener("click", async () => {
-          captchaFeedback.className = "key-feedback";
-          captchaFeedback.textContent = "Scanning aura...";
-          try {
-            const res = await fetch(`${API_BASE}/api/captcha/verify`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ challengeId: challenge.id, answerId: opt.id }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data.captchaToken) {
-              captchaModal.classList.remove("open");
-              showToast(`🛡️ Vibe check passed! ${data.credits || 10} smooth moves unlocked`, "web");
-              const resFn = captchaResolver;
-              captchaResolver = null;
-              captchaRejecter = null;
-              if (resFn) resFn(data.captchaToken);
-            } else {
-              captchaFeedback.className = "key-feedback err";
-              captchaFeedback.textContent = data.error || "Wrong vibe! Try the new one.";
-              if (data.challenge) renderCaptchaChallenge(data.challenge);
-            }
-          } catch (err) {
-            captchaFeedback.className = "key-feedback err";
-            captchaFeedback.textContent = err.message;
+    function waitForTurnstileApi(timeoutMs = 6000) {
+      return new Promise((resolve, reject) => {
+        if (window.turnstile) return resolve(window.turnstile);
+        const start = Date.now();
+        const iv = setInterval(() => {
+          if (window.turnstile) {
+            clearInterval(iv);
+            resolve(window.turnstile);
+          } else if (Date.now() - start > timeoutMs) {
+            clearInterval(iv);
+            reject(new Error("Cloudflare Turnstile failed to load (check adblocker)"));
           }
-        });
-        captchaGrid.appendChild(btn);
-      }
+        }, 60);
+      });
     }
 
-    function solveAuraCaptcha(challenge) {
-      return new Promise((resolve, reject) => {
-        if (captchaRejecter) captchaRejecter(new Error("Superseded by new vibe check"));
+    async function solveTurnstileChallenge(serverSiteKey) {
+      if (captchaRejecter) captchaRejecter(new Error("Superseded by new check"));
+      resetTurnstileHost();
+
+      const sitekey = serverSiteKey || DEFAULT_TURNSTILE_SITE_KEY;
+      const theme = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+
+      return new Promise(async (resolve, reject) => {
         captchaResolver = resolve;
         captchaRejecter = reject;
         captchaFeedback.className = "key-feedback";
         captchaFeedback.textContent = "";
-        renderCaptchaChallenge(challenge);
-        captchaModal.classList.add("open");
+
+        let ts;
+        try {
+          ts = await waitForTurnstileApi();
+        } catch (err) {
+          captchaResolver = null;
+          captchaRejecter = null;
+          return reject(err);
+        }
+
+        // Start in silent interaction-only probe so normal humans don't even see a popup
+        captchaModal.classList.add("silent-probe");
+        turnstileRevealTimer = setTimeout(() => {
+          if (captchaModal.classList.contains("silent-probe")) {
+            captchaModal.classList.remove("silent-probe");
+            captchaModal.classList.add("open");
+          }
+        }, 1800);
+
+        turnstileWidgetId = ts.render(turnstileContainer, {
+          sitekey,
+          theme,
+          appearance: "interaction-only",
+          "before-interactive-callback": () => {
+            clearTimeout(turnstileRevealTimer);
+            captchaModal.classList.remove("silent-probe");
+            captchaModal.classList.add("open");
+          },
+          callback: async (cfToken) => {
+            clearTimeout(turnstileRevealTimer);
+            captchaFeedback.className = "key-feedback";
+            captchaFeedback.textContent = "Verifying with Cloudflare...";
+            try {
+              const res = await fetch(`${API_BASE}/api/captcha/verify`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token: cfToken }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (res.ok && data.captchaToken) {
+                resetTurnstileHost();
+                showToast(`🛡️ Cloudflare verified! ${data.credits || 10} smooth moves unlocked`, "web");
+                const resFn = captchaResolver;
+                captchaResolver = null;
+                captchaRejecter = null;
+                if (resFn) resFn(data.captchaToken);
+              } else {
+                captchaModal.classList.remove("silent-probe");
+                captchaModal.classList.add("open");
+                captchaFeedback.className = "key-feedback err";
+                captchaFeedback.textContent = data.error || "Verification failed — retrying...";
+                if (turnstileWidgetId !== null) ts.reset(turnstileWidgetId);
+              }
+            } catch (err) {
+              captchaModal.classList.remove("silent-probe");
+              captchaModal.classList.add("open");
+              captchaFeedback.className = "key-feedback err";
+              captchaFeedback.textContent = err.message;
+            }
+          },
+          "error-callback": (code) => {
+            clearTimeout(turnstileRevealTimer);
+            captchaModal.classList.remove("silent-probe");
+            captchaModal.classList.add("open");
+            captchaFeedback.className = "key-feedback err";
+            captchaFeedback.textContent = `Cloudflare Turnstile error (${code || "network"}) — tap retry or check domain.`;
+          },
+          "expired-callback": () => {
+            if (turnstileWidgetId !== null) ts.reset(turnstileWidgetId);
+          },
+        });
       });
     }
 

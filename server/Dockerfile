@@ -3,7 +3,7 @@ FROM rust:1-bookworm AS builder
 WORKDIR /app
 
 # Cache dependency compilation first
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 RUN mkdir -p src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release && rm -rf src
 

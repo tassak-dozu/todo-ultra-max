@@ -9,7 +9,7 @@ use axum::{
     },
     http::{header, HeaderMap, Method, StatusCode},
     response::{IntoResponse, Response},
-    routing::{delete, get, patch, post},
+    routing::{get, patch, post},
     Json, Router,
 };
 use futures_util::{SinkExt, StreamExt};
@@ -30,7 +30,7 @@ use tokio::sync::broadcast;
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
-use crate::captcha::CaptchaGate;
+use crate::captcha::TurnstileGate;
 use crate::db::{bucket_label, now_ms, ResolutionSummary, TodoDB};
 use crate::mcp::handle_mcp_payload;
 
@@ -61,7 +61,7 @@ struct PeerState {
 
 struct AppState {
     db: TodoDB,
-    captcha: CaptchaGate,
+    captcha: TurnstileGate,
     tx: broadcast::Sender<String>,
     peers: Mutex<HashMap<String, PeerState>>,
     activity: Mutex<VecDeque<ActivityEvent>>,
@@ -249,13 +249,14 @@ fn json_resp(status: StatusCode, body: Value) -> Response {
     (status, Json(body)).into_response()
 }
 
-fn captcha_required_resp(challenge: captcha::CaptchaChallengePublic) -> Response {
+fn captcha_required_resp(st: &AppState) -> Response {
     json_resp(
         StatusCode::PRECONDITION_REQUIRED,
         json!({
-            "error": "Quick aura vibe check required!",
+            "error": "Cloudflare Turnstile verification required!",
             "captchaRequired": true,
-            "challenge": challenge
+            "turnstileRequired": true,
+            "siteKey": st.captcha.site_key
         }),
     )
 }
@@ -316,10 +317,9 @@ struct PlaceBetBody {
 
 #[derive(Deserialize)]
 struct VerifyCaptchaBody {
-    #[serde(rename = "challengeId")]
-    challenge_id: Option<String>,
-    #[serde(rename = "answerId")]
-    answer_id: Option<String>,
+    token: Option<String>,
+    #[serde(rename = "cf-turnstile-response")]
+    cf_turnstile_response: Option<String>,
 }
 
 async fn health(State(st): State<Arc<AppState>>) -> Response {
@@ -330,6 +330,8 @@ async fn health(State(st): State<Arc<AppState>>) -> Response {
             "ok": true,
             "engine": "rust-axum-blazingly-fast",
             "poweredBy": "AI + 🦀 Rust",
+            "turnstileEnabled": st.captcha.is_enabled(),
+            "turnstileSiteKey": st.captcha.site_key,
             "transport": "http+ws+mcp",
             "authMode": st.auth_mode,
             "online": online,
@@ -356,36 +358,23 @@ async fn verify_auth(
     )
 }
 
-async fn get_captcha_challenge(
-    State(st): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Response {
-    let ip = st.client_ip(&headers);
-    let ch = st.captcha.issue_challenge(&ip);
-    json_resp(StatusCode::OK, json!({ "challenge": ch }))
-}
-
 async fn verify_captcha(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(body): Json<VerifyCaptchaBody>,
 ) -> Response {
     let ip = st.client_ip(&headers);
-    let (Some(cid), Some(aid)) = (body.challenge_id.as_deref(), body.answer_id.as_deref()) else {
-        return json_resp(StatusCode::BAD_REQUEST, json!({ "error": "challengeId and answerId required" }));
-    };
-    match st.captcha.verify(&ip, cid, aid) {
-        Ok((token, credits)) => json_resp(
+    let token = body
+        .token
+        .as_deref()
+        .or(body.cf_turnstile_response.as_deref())
+        .unwrap_or("");
+    match st.captcha.verify_turnstile(&ip, token).await {
+        Ok((one_time, credits)) => json_resp(
             StatusCode::OK,
-            json!({ "ok": true, "captchaToken": token, "credits": credits }),
+            json!({ "ok": true, "captchaToken": one_time, "credits": credits }),
         ),
-        Err(msg) => {
-            let next = st.captcha.issue_challenge(&ip);
-            json_resp(
-                StatusCode::BAD_REQUEST,
-                json!({ "error": msg, "challenge": next }),
-            )
-        }
+        Err(msg) => json_resp(StatusCode::FORBIDDEN, json!({ "error": msg })),
     }
 }
 
@@ -436,11 +425,19 @@ async fn create_todo(
         );
     }
 
-    // Adaptive Aura Captcha on adding tasks (bypassed when authenticated via API key)
+    // Adaptive Cloudflare Turnstile on adding tasks (bypassed when authenticated via API key)
     if !st.has_valid_api_key_header(&headers) {
         let cap_tok = headers.get("x-captcha-token").and_then(|v| v.to_str().ok());
-        if let Err(challenge) = st.captcha.check_or_challenge(&ip, cap_tok) {
-            return captcha_required_resp(challenge);
+        if st.captcha.check_or_require(&ip, cap_tok).is_err() {
+            if let Some(cf_tok) = headers.get("x-turnstile-token").and_then(|v| v.to_str().ok()) {
+                if let Ok((one_time, _)) = st.captcha.verify_turnstile(&ip, cf_tok).await {
+                    let _ = st.captcha.check_or_require(&ip, Some(&one_time));
+                } else {
+                    return captcha_required_resp(&st);
+                }
+            } else {
+                return captcha_required_resp(&st);
+            }
         }
     }
 
@@ -489,11 +486,19 @@ async fn clear_completed(
         );
     }
 
-    // Adaptive Aura Captcha on bulk delete
+    // Adaptive Cloudflare Turnstile on bulk delete
     if !st.has_valid_api_key_header(&headers) {
         let cap_tok = headers.get("x-captcha-token").and_then(|v| v.to_str().ok());
-        if let Err(challenge) = st.captcha.check_or_challenge(&ip, cap_tok) {
-            return captcha_required_resp(challenge);
+        if st.captcha.check_or_require(&ip, cap_tok).is_err() {
+            if let Some(cf_tok) = headers.get("x-turnstile-token").and_then(|v| v.to_str().ok()) {
+                if let Ok((one_time, _)) = st.captcha.verify_turnstile(&ip, cf_tok).await {
+                    let _ = st.captcha.check_or_require(&ip, Some(&one_time));
+                } else {
+                    return captcha_required_resp(&st);
+                }
+            } else {
+                return captcha_required_resp(&st);
+            }
         }
     }
 
@@ -591,11 +596,19 @@ async fn delete_todo(
         );
     }
 
-    // Adaptive Aura Captcha on removing tasks
+    // Adaptive Cloudflare Turnstile on removing tasks
     if !st.has_valid_api_key_header(&headers) {
         let cap_tok = headers.get("x-captcha-token").and_then(|v| v.to_str().ok());
-        if let Err(challenge) = st.captcha.check_or_challenge(&ip, cap_tok) {
-            return captcha_required_resp(challenge);
+        if st.captcha.check_or_require(&ip, cap_tok).is_err() {
+            if let Some(cf_tok) = headers.get("x-turnstile-token").and_then(|v| v.to_str().ok()) {
+                if let Ok((one_time, _)) = st.captcha.verify_turnstile(&ip, cf_tok).await {
+                    let _ = st.captcha.check_or_require(&ip, Some(&one_time));
+                } else {
+                    return captcha_required_resp(&st);
+                }
+            } else {
+                return captcha_required_resp(&st);
+            }
         }
     }
 
@@ -1025,12 +1038,16 @@ async fn main() {
         Some(sha256_bytes(&api_key))
     };
 
+    let turnstile_site_key = env::var("TURNSTILE_SITE_KEY").unwrap_or_default();
+    let turnstile_secret_key = env::var("TURNSTILE_SECRET_KEY").unwrap_or_default();
+    let turnstile_enabled = !turnstile_secret_key.trim().is_empty();
+
     let db = TodoDB::open(&db_path, max_todos).expect("Failed to open SQLite DB");
     let (tx, _) = broadcast::channel::<String>(256);
 
     let state = Arc::new(AppState {
         db,
-        captcha: CaptchaGate::new(),
+        captcha: TurnstileGate::new(turnstile_site_key, turnstile_secret_key),
         tx,
         peers: Mutex::new(HashMap::new()),
         activity: Mutex::new(VecDeque::new()),
@@ -1056,7 +1073,6 @@ async fn main() {
     let app = Router::new()
         .route("/api/health", get(health))
         .route("/api/auth/verify", get(verify_auth))
-        .route("/api/captcha/challenge", get(get_captcha_challenge))
         .route("/api/captcha/verify", post(verify_captcha))
         .route(
             "/api/todos",
@@ -1074,7 +1090,7 @@ async fn main() {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     println!(
-        "🦀 Blazingly Fast Rust Kanban + Gambling + Captcha + WS + MCP listening on http://{addr} (db: {db_path}, auth: {auth_mode})"
+        "🦀 Blazingly Fast Rust Kanban + Gambling + Turnstile({turnstile_enabled}) + WS + MCP listening on http://{addr} (db: {db_path}, auth: {auth_mode})"
     );
     let listener = tokio::net::TcpListener::bind(addr)
         .await
