@@ -107,6 +107,9 @@ struct AppState {
     trades: Mutex<HashMap<String, TradeSession>>,
     activity: Mutex<VecDeque<ActivityEvent>>,
     rate_buckets: Mutex<HashMap<String, (u32, i64)>>,
+    add_cooldowns: Mutex<HashMap<String, i64>>,
+    delete_cooldowns: Mutex<HashMap<String, i64>>,
+    move_cooldowns: Mutex<HashMap<String, i64>>,
     mcp_write_min_buckets: Mutex<HashMap<String, (u32, i64)>>,
     mcp_write_hr_buckets: Mutex<HashMap<String, (u32, i64)>>,
     mcp_read_buckets: Mutex<HashMap<String, (u32, i64)>>,
@@ -234,6 +237,24 @@ impl AppState {
         }
         entry.0 += 1;
         true
+    }
+
+    fn check_cooldown(map_mutex: &Mutex<HashMap<String, i64>>, key: &str) -> Result<(), i64> {
+        let now = now_ms();
+        let mut map = map_mutex.lock().unwrap();
+        if let Some(&until) = map.get(key) {
+            if now < until {
+                let rem_sec = ((until - now) + 999) / 1000;
+                return Err(rem_sec.max(1));
+            }
+            map.remove(key);
+        }
+        Ok(())
+    }
+
+    fn set_cooldown(map_mutex: &Mutex<HashMap<String, i64>>, key: &str, duration_ms: i64) {
+        let mut map = map_mutex.lock().unwrap();
+        map.insert(key.to_string(), now_ms() + duration_ms);
     }
 
     fn check_rate_limit(&self, ip: &str) -> bool {
@@ -862,6 +883,16 @@ async fn create_todo(
             json!({ "error": "Too many requests, slow down" }),
         );
     }
+    if let Err(sec) = AppState::check_cooldown(&st.add_cooldowns, &ip) {
+        return json_resp(
+            StatusCode::TOO_MANY_REQUESTS,
+            json!({
+                "error": format!("⏳ Slow down! Wait {sec}s before adding another task (20s cooldown)."),
+                "code": "cooldown",
+                "retryAfterSec": sec
+            }),
+        );
+    }
 
     let Some(text) = body.text.as_deref() else {
         return json_resp(StatusCode::BAD_REQUEST, json!({ "error": "Task text is required" }));
@@ -895,6 +926,7 @@ async fn create_todo(
 
     match st.db.add(text, body.status.as_deref(), body.priority.as_deref()) {
         Ok(todo) => {
+            AppState::set_cooldown(&st.add_cooldowns, &ip, 20_000);
             let short: String = todo.text.chars().take(48).collect();
             let ev = st.record_activity(
                 "added",
@@ -999,6 +1031,16 @@ async fn patch_todo(
             json!({ "error": "Too many requests, slow down" }),
         );
     }
+    if let Err(sec) = AppState::check_cooldown(&st.move_cooldowns, &ip) {
+        return json_resp(
+            StatusCode::TOO_MANY_REQUESTS,
+            json!({
+                "error": format!("⏳ Slow down! Max 1 move/edit per second — wait {sec}s."),
+                "code": "cooldown",
+                "retryAfterSec": sec
+            }),
+        );
+    }
     let before = st.db.get(&id);
     match st.db.update(
         &id,
@@ -1009,6 +1051,7 @@ async fn patch_todo(
         body.position,
     ) {
         Ok(Some((updated, resolution))) => {
+            AppState::set_cooldown(&st.move_cooldowns, &ip, 1_000);
             let moved = before.as_ref().map(|b| b.status != updated.status).unwrap_or(false);
             let short: String = updated.text.chars().take(42).collect();
             let mut ev = st.record_activity(
@@ -1058,6 +1101,16 @@ async fn delete_todo(
             json!({ "error": "Too many requests, slow down" }),
         );
     }
+    if let Err(sec) = AppState::check_cooldown(&st.delete_cooldowns, &ip) {
+        return json_resp(
+            StatusCode::TOO_MANY_REQUESTS,
+            json!({
+                "error": format!("⏳ Chill! Only 1 delete per minute — wait {sec}s."),
+                "code": "cooldown",
+                "retryAfterSec": sec
+            }),
+        );
+    }
 
     // Adaptive Cloudflare Turnstile on removing tasks (bypassed when Admin or authenticated via API key)
     if !st.is_admin(&headers, None) && !st.has_valid_api_key_header(&headers) {
@@ -1078,6 +1131,7 @@ async fn delete_todo(
     let before = st.db.get(&id);
     match st.db.delete(&id) {
         Ok((true, resolution)) => {
+            AppState::set_cooldown(&st.delete_cooldowns, &ip, 60_000);
             let summary = match before {
                 Some(b) => {
                     let short: String = b.text.chars().take(44).collect();
@@ -2316,6 +2370,9 @@ async fn main() {
         trades: Mutex::new(HashMap::new()),
         activity: Mutex::new(VecDeque::new()),
         rate_buckets: Mutex::new(HashMap::new()),
+        add_cooldowns: Mutex::new(HashMap::new()),
+        delete_cooldowns: Mutex::new(HashMap::new()),
+        move_cooldowns: Mutex::new(HashMap::new()),
         mcp_write_min_buckets: Mutex::new(HashMap::new()),
         mcp_write_hr_buckets: Mutex::new(HashMap::new()),
         mcp_read_buckets: Mutex::new(HashMap::new()),

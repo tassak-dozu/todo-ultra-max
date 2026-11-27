@@ -5668,20 +5668,24 @@
         burstAtEl(addBtn, 22);
       } catch (err) {
         if (err.status === 429) {
-          const dupKey = trimmed.replace(/\s+/g, " ").toLowerCase();
-          const match = todos.find((t) => t.text.trim().replace(/\s+/g, " ").toLowerCase() === dupKey);
-          if (match) {
-            flashCardId = match.id;
-            render();
-            const dupEl = document.querySelector(`.card[data-id="${match.id}"]`);
-            if (dupEl) {
-              dupEl.classList.remove("aura-repel");
-              void dupEl.offsetWidth;
-              dupEl.classList.add("aura-repel");
-            }
-          }
           sfx.betLost();
-          showToast("🚫 Duplicate detected (HTTP 429) — already on the board!", "web");
+          if (err.message && err.message.startsWith("DUPLICATE:")) {
+            const dupKey = trimmed.replace(/\s+/g, " ").toLowerCase();
+            const match = todos.find((t) => t.text.trim().replace(/\s+/g, " ").toLowerCase() === dupKey);
+            if (match) {
+              flashCardId = match.id;
+              render();
+              const dupEl = document.querySelector(`.card[data-id="${match.id}"]`);
+              if (dupEl) {
+                dupEl.classList.remove("aura-repel");
+                void dupEl.offsetWidth;
+                dupEl.classList.add("aura-repel");
+              }
+            }
+            showToast("🚫 Duplicate detected (HTTP 429) — already on the board!", "web");
+          } else {
+            showToast(err.message || "⏳ Slow down! Cooldown active.", "web");
+          }
         }
         handleApiError("Failed to add task", err);
       } finally {
@@ -5708,6 +5712,10 @@
       } catch (err) {
         todos = prev;
         render();
+        if (err.status === 429) {
+          sfx.betLost();
+          showToast(err.message || "⏳ Slow down! Max 1 move per second.", "web");
+        }
         handleApiError("Failed to update task", err);
       } finally {
         pendingMutations--;
@@ -5748,6 +5756,10 @@
       } catch (err) {
         todos = prev;
         render();
+        if (err.status === 429) {
+          sfx.betLost();
+          showToast(err.message || "⏳ Delete cooldown active (1 per minute).", "web");
+        }
         handleApiError("Failed to delete task", err);
       } finally {
         pendingMutations--;
