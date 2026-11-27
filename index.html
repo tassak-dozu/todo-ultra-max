@@ -179,6 +179,118 @@
       -webkit-text-fill-color: transparent;
     }
 
+    .ai-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 11px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #fff;
+      background: linear-gradient(120deg, rgba(139, 92, 246, 0.85), rgba(244, 114, 182, 0.8), rgba(34, 211, 238, 0.85));
+      background-size: 200% 200%;
+      animation: aiShimmer 5s ease infinite;
+      box-shadow: 0 0 22px rgba(139, 92, 246, 0.45);
+    }
+
+    .rust-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #fdba74;
+      background: rgba(249, 115, 22, 0.14);
+      border: 1px solid rgba(249, 115, 22, 0.42);
+      box-shadow: 0 0 18px rgba(249, 115, 22, 0.18);
+    }
+
+    @keyframes aiShimmer {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    .ai-footer {
+      margin-top: 28px;
+      padding: 13px 18px;
+      border-radius: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 0.76rem;
+      color: var(--muted);
+    }
+
+    .ai-footer strong {
+      background: linear-gradient(90deg, #c4b5fd, #67e8f9, #fdba74);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 800;
+    }
+
+    /* Aura Captcha Modal */
+    .captcha-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 14px 0 12px;
+    }
+
+    .captcha-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 16px 8px;
+      border-radius: 14px;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      cursor: pointer;
+      transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.16s ease, background 0.14s ease;
+    }
+
+    .captcha-tile:hover {
+      transform: translateY(-2px) scale(1.03);
+      border-color: rgba(139, 92, 246, 0.75);
+      background: rgba(139, 92, 246, 0.14);
+      box-shadow: 0 0 26px rgba(139, 92, 246, 0.35), 0 0 14px rgba(34, 211, 238, 0.25);
+    }
+
+    .captcha-tile:active {
+      transform: scale(0.96);
+    }
+
+    .captcha-emoji {
+      font-size: 1.9rem;
+      line-height: 1;
+      filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.25));
+    }
+
+    .captcha-prompt-box {
+      padding: 11px 14px;
+      border-radius: 12px;
+      background: linear-gradient(120deg, rgba(139, 92, 246, 0.16), rgba(34, 211, 238, 0.12));
+      border: 1px solid rgba(139, 92, 246, 0.38);
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text);
+      text-align: center;
+    }
+
     html[data-theme="light"] .brand-title {
       background: linear-gradient(95deg, #0f172a 15%, #6d28d9 65%, #0891b2 100%);
       -webkit-background-clip: text;
@@ -1419,6 +1531,8 @@
       <div class="brand">
         <div class="brand-mark">⚡</div>
         <span class="brand-title">Board of Destiny</span>
+        <span class="ai-pill">✨ Powered by AI</span>
+        <span class="rust-pill mono">🦀 Rust</span>
 
         <span class="live-pill" id="live-pill" aria-live="polite">
           <span class="pulse-dot"></span>
@@ -1559,6 +1673,25 @@
       </div>
       <ul class="list-items" id="list-items"></ul>
     </section>
+
+    <footer class="ai-footer">
+      <span>✨ <strong>Powered by AI™</strong> · 100% Artisanal Neural Synergy (zero hallucinations promised*)</span>
+      <span class="mono">🦀 <strong>BLAZINGLY FAST RUST</strong> · Zero-GC · Adaptive Aura Captcha</span>
+    </footer>
+  </div>
+
+  <!-- Aura Captcha Modal -->
+  <div class="modal-backdrop" id="captcha-modal" role="dialog" aria-modal="true" aria-labelledby="captcha-title">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="captcha-title">🛡️ Aura Vibe Check</h2>
+        <button type="button" class="icon-btn" id="captcha-close">&times;</button>
+      </div>
+      <p>Slow down speedrunner — pass one quick vibe check to unlock 10 smooth moves.</p>
+      <div class="captcha-prompt-box" id="captcha-prompt">Loading vibe check...</div>
+      <div class="captcha-grid" id="captcha-grid"></div>
+      <div class="key-feedback" id="captcha-feedback"></div>
+    </div>
   </div>
 
   <!-- Floating Live Event Toasts -->
@@ -2086,6 +2219,14 @@
       }
       const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
       const data = await res.json().catch(() => ({}));
+      if (res.status === 428 && data.captchaRequired && data.challenge && !options._captchaRetried) {
+        const captchaToken = await solveAuraCaptcha(data.challenge);
+        return api(path, {
+          ...options,
+          _captchaRetried: true,
+          headers: { ...headers, "X-Captcha-Token": captchaToken },
+        });
+      }
       if (!res.ok) {
         const err = new Error(data.error || `Request failed (${res.status})`);
         err.status = res.status;
@@ -2704,8 +2845,87 @@
         supportPanel.classList.remove("open");
         betModal.classList.remove("open");
         walletModal.classList.remove("open");
+        cancelAuraCaptcha();
       }
     });
+
+    // Adaptive Aura Captcha Modal Controller
+    const captchaModal = document.getElementById("captcha-modal");
+    const captchaClose = document.getElementById("captcha-close");
+    const captchaPrompt = document.getElementById("captcha-prompt");
+    const captchaGrid = document.getElementById("captcha-grid");
+    const captchaFeedback = document.getElementById("captcha-feedback");
+    let captchaResolver = null;
+    let captchaRejecter = null;
+
+    function cancelAuraCaptcha() {
+      captchaModal.classList.remove("open");
+      if (captchaRejecter) {
+        const rej = captchaRejecter;
+        captchaResolver = null;
+        captchaRejecter = null;
+        rej(new Error("Vibe check cancelled"));
+      }
+    }
+
+    captchaClose.addEventListener("click", cancelAuraCaptcha);
+    captchaModal.addEventListener("click", (e) => {
+      if (e.target === captchaModal) cancelAuraCaptcha();
+    });
+
+    function renderCaptchaChallenge(challenge) {
+      captchaPrompt.textContent = challenge.prompt;
+      captchaGrid.innerHTML = "";
+      for (const opt of challenge.options) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "captcha-tile";
+        const em = document.createElement("span");
+        em.className = "captcha-emoji";
+        em.textContent = opt.emoji;
+        btn.appendChild(em);
+        btn.addEventListener("click", async () => {
+          captchaFeedback.className = "key-feedback";
+          captchaFeedback.textContent = "Scanning aura...";
+          try {
+            const res = await fetch(`${API_BASE}/api/captcha/verify`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ challengeId: challenge.id, answerId: opt.id }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.captchaToken) {
+              captchaModal.classList.remove("open");
+              showToast(`🛡️ Vibe check passed! ${data.credits || 10} smooth moves unlocked`, "web");
+              const resFn = captchaResolver;
+              captchaResolver = null;
+              captchaRejecter = null;
+              if (resFn) resFn(data.captchaToken);
+            } else {
+              captchaFeedback.className = "key-feedback err";
+              captchaFeedback.textContent = data.error || "Wrong vibe! Try the new one.";
+              if (data.challenge) renderCaptchaChallenge(data.challenge);
+            }
+          } catch (err) {
+            captchaFeedback.className = "key-feedback err";
+            captchaFeedback.textContent = err.message;
+          }
+        });
+        captchaGrid.appendChild(btn);
+      }
+    }
+
+    function solveAuraCaptcha(challenge) {
+      return new Promise((resolve, reject) => {
+        if (captchaRejecter) captchaRejecter(new Error("Superseded by new vibe check"));
+        captchaResolver = resolve;
+        captchaRejecter = reject;
+        captchaFeedback.className = "key-feedback";
+        captchaFeedback.textContent = "";
+        renderCaptchaChallenge(challenge);
+        captchaModal.classList.add("open");
+      });
+    }
 
     // Prediction Gambling UI
     const walletBtn = document.getElementById("wallet-btn");

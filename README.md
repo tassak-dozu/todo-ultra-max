@@ -2,15 +2,16 @@
 
 # ⚡ TODO ULTRA MAX ⚡
 
-### 🌌 Real-Time Shared Kanban Board · 🔌 Native WebSockets · 🤖 Live MCP · 🛡️ Cloudflare Tunnel
+### ✨ Powered by AI™ · 🦀 Blazingly Fast Rust Backend · 🔌 Native WebSockets · 🎰 Prediction Gambling · 🤖 Live MCP · 🛡️ Adaptive Aura Captcha
 
 [![Live App](https://img.shields.io/badge/🚀_LIVE_APP-GitHub_Pages-8b5cf6?style=for-the-badge)](https://tassak-dozu.github.io/todo-ultra-max/)
+[![Powered by AI](https://img.shields.io/badge/✨_POWERED_BY-AI™-f472b6?style=for-the-badge)](https://tassak-dozu.github.io/todo-ultra-max/)
+[![Blazingly Fast Rust](https://img.shields.io/badge/🦀_BACKEND-BLAZINGLY_FAST_RUST-f97316?style=for-the-badge)](./server/src/main.rs)
 [![Live API](https://img.shields.io/badge/⚡_API-Cloudflare_Tunnel-22d3ee?style=for-the-badge)](https://todo-ultra-max.mantikafasi.dev/api/health)
-[![MCP Ready](https://img.shields.io/badge/🤖_MCP-Streamable_HTTP-f472b6?style=for-the-badge)](https://todo-ultra-max.mantikafasi.dev/mcp)
-[![Runtime](https://img.shields.io/badge/🥟_Bun-SQLite_WAL-10b981?style=for-the-badge)](https://bun.sh)
+[![MCP Ready](https://img.shields.io/badge/🤖_MCP-Streamable_HTTP-10b981?style=for-the-badge)](https://todo-ultra-max.mantikafasi.dev/mcp)
 [![Docker](https://img.shields.io/badge/🐳_Docker-Zero_Exposed_Ports-0ea5e9?style=for-the-badge)](./docker-compose.yml)
 
-**One shared board. Zero frameworks. Maximum aura. Pure velocity.** 🔥
+**One shared board. Powered by AI™. Rewritten in Blazingly Fast Rust (`axum` + `tokio` + bundled SQLite). Zero GC pauses. Maximum aura.** 🔥🦀✨
 
 </div>
 
@@ -18,13 +19,13 @@
 
 ## ✨ What's Inside
 
-- 🗂️ **Kanban + List Views** — Silky drag-and-drop across **Procrastinating (`To Do`)**, **Actually Cooking (`In Progress`)**, and **Certified Done (`Done`)** with priority glow pills (`Low` / `Medium` / `High`) and double-click inline editing.
-- 🌌 **Maximum Aura UI** — Multi-layer drifting aurora mesh, cursor-reactive spotlight cards, remote-drag glow rings, neon update flashes, and Dark/Light mode.
-- 📡 **Live Telemetry & Presence** — Real-time WebSocket RTT (`ms`) + signal bars, stacked glowing online viewer orbs, live *"Someone is cooking..."* typing indicator, and a live activity ticker + stream drawer.
-- 🤖 **Built-in MCP Server (`/mcp`)** — Plug in any Streamable HTTP MCP client and watch cards appear, move, bet, and settle live in every browser tab.
-- 🎰 **Card Completion Prediction Gambling** — Every player starts with `1,000 🪙` Aura Coins to bet on when any open card will finish (`⚡ < 5 min`, `🔥 5m – 1h`, `🐢 1h – 24h`, `💀 24h+ / Nuked`), with live parimutuel odds, auto-settlement on completion/deletion, bailouts, and a global leaderboard (and MCP `place_bet` / `get_leaderboard` tools!).
-- 🔐 **API Key Gatekeeper** — Optional `API_KEY` protection (`writes` or `all` mode) with an in-app API Key modal, live verification, and automatic `Authorization: Bearer` injection into REST, WebSocket, and MCP snippets.
-- 🛡️ **Zero-Exposed-Port VPS Deployment** — Runs inside Docker on a VPS with a permanent Cloudflare Tunnel sidecar (`cloudflared`) so your origin IP stays invisible.
+- 🦀 **Blazingly Fast Rust Backend** — Built with `axum` + `tokio` + `rusqlite` (WAL mode) compiled to a tiny stripped release binary. Sub-millisecond responses, single-digit MB RAM, zero garbage collection.
+- ✨ **Powered by AI™ Everywhere** — Iridescent AI aura badges, Agent Kevin's Live Support™ garbage-English engine, and native MCP robot control.
+- 🗂️ **Kanban + List Views** — Drag-and-drop across **Procrastinating (`To Do`)**, **Actually Cooking (`In Progress`)**, and **Certified Done (`Done`)** with priority glow pills and double-click inline editing.
+- 🎰 **Card Completion Prediction Gambling** — Start with `1,000 🪙` Aura Coins and bet on when any open card finishes (`⚡ < 5 min`, `🔥 5m – 1h`, `🐢 1h – 24h`, `💀 24h+ / Nuked`) with live parimutuel odds, auto-settlement, emergency bailouts, global leaderboard, and MCP `place_bet` / `get_leaderboard` tools.
+- 🛡️ **Adaptive Aura Captcha** — Never nags on normal usage; only pops a neon 6-tile **Aura Vibe Check** on rapid add/delete bursts, then unlocks 10 frictionless moves for 5 minutes.
+- 📡 **Live Telemetry & Presence** — Real-time WebSocket RTT (`ms`), signal bars, stacked online viewer orbs, typing indicator, remote-drag neon glow, and live board gossip feed.
+- 🔐 **API Key Gatekeeper** — Optional `API_KEY` protection (`writes` or `all` mode) with constant-time SHA-256 verification and an in-app **🔑 VIP Pass** modal.
 
 ---
 
@@ -32,21 +33,25 @@
 
 | Method & Path | Description |
 | --- | --- |
-| `GET /api/health` | 💓 Health check, auth mode, live online count & MCP call counter |
+| `GET /api/health` | 💓 Health check, Rust engine telemetry, auth mode, online count & MCP calls |
 | `GET /api/auth/verify` | 🔑 Verify an API key (`Authorization: Bearer` / `X-API-Key` / `?api_key=`) |
-| `GET /api/todos` | 📋 Fetch all shared cards + live presence & activity feed |
+| `GET /api/captcha/challenge` | 🛡️ Request an Aura Vibe Check challenge |
+| `POST /api/captcha/verify` | ✅ Verify Aura Captcha & unlock 10 frictionless add/delete moves |
+| `GET /api/todos` | 📋 Fetch all shared cards, open betting markets, leaderboard & activity |
 | `POST /api/todos` | ➕ Spawn a card (`{ "text", "status"?, "priority"? }`) |
-| `PATCH /api/todos/:id` | 🚚 Move column, flip priority, or edit text |
-| `DELETE /api/todos/:id` | 🗑️ Yeet a single card into the void |
+| `PATCH /api/todos/:id` | 🚚 Move column (moving to `done` settles bets!), edit priority/text |
+| `DELETE /api/todos/:id` | 🗑️ Yeet a card (deleting an open card settles `never` as winner!) |
 | `DELETE /api/todos?completed=true` | 🧹 Nuke everything in Done |
+| `GET /api/wallet` | 🪙 Fetch/create player wallet, bet history & leaderboard |
+| `POST /api/wallet/bailout` | 💸 Emergency `+500 🪙` bailout when balance `< 100` |
+| `POST /api/bets` | 🎰 Place a prediction wager on an open card |
+| `GET /api/leaderboard` | 👑 Global richest degens leaderboard |
 | `GET /ws` | ⚡ Live WebSocket stream (sync, presence, typing, remote drag, ping/pong RTT) |
-| `POST /mcp` | 🤖 Streamable HTTP MCP (`list_todos`, `add_todo`, `move_todo`, `toggle_todo`, `delete_todo`, `clear_completed`) |
+| `POST /mcp` | 🤖 Streamable HTTP MCP (`list_todos`, `add_todo`, `move_todo`, `toggle_todo`, `delete_todo`, `clear_completed`, `place_bet`, `get_leaderboard`) |
 
 ---
 
 ## 🤖 Connect via MCP
-
-Drop this straight into your MCP client config:
 
 ```json
 {
@@ -63,7 +68,7 @@ Drop this straight into your MCP client config:
 
 ---
 
-## 🐳 Self-Host on a VPS (Docker + Cloudflare Tunnel)
+## 🐳 Self-Host on a VPS (Rust Docker + Cloudflare Tunnel)
 
 ```bash
 git clone https://github.com/tassak-dozu/todo-ultra-max.git
@@ -72,21 +77,3 @@ cp .env.example .env
 # Add CLOUDFLARE_TUNNEL_TOKEN=... (and optional API_KEY=... / API_KEY_MODE=writes)
 docker compose up -d --build server cloudflared
 ```
-
-> ⚡ Need a zero-config test URL without a tunnel token?
-> ```bash
-> docker compose --profile quick up -d --build server cloudflared-quick
-> docker compose --profile quick logs -f cloudflared-quick
-> ```
-
----
-
-## 🔐 Environment Variables
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `CLOUDFLARE_TUNNEL_TOKEN` | *(none)* | 🛡️ Permanent Cloudflare Zero Trust Tunnel token |
-| `API_KEY` | *(empty = open)* | 🔑 Secret key required for writes (or all requests) |
-| `API_KEY_MODE` | `writes` | 🚦 `writes` (public read, key to mutate) or `all` (key for everything) |
-| `MAX_TODOS` | `500` | 📦 Max cards allowed on the board |
-| `WRITE_LIMIT_PER_MIN` | `90` | 🧱 Per-IP writes/min rate limit (honors `CF-Connecting-IP`) |

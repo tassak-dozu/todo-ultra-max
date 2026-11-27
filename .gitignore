@@ -1,5 +1,6 @@
 .env
 server/data/
+server/target/
 *.db
 *.db-wal
 *.db-shm
